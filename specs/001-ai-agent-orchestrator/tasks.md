@@ -52,73 +52,73 @@
 
 > **TDD サイクル**: テスト T009 → 実装 T010
 
-- [ ] T009 **RED テスト作成**: `tests/unit/types.test.ts` を作成し、test-cases.md の T-TYP-001〜T-TYP-016 の全 16 テストケースを記述する。具体的には: (1) `TaskType` の有効値 4 種が `safeParse` で成功すること、(2) `TaskType` の無効値 `"deploy"`, `""`, `null` が失敗すること、(3) `TaskStatus` の有効値 5 種が成功すること、(4) `CreateTaskInput` の必須フィールド `id`, `taskType`, `title`, `description`, `source` をそれぞれ 1 つずつ欠落させて失敗すること、(5) `priority` が `0` と `11` で失敗し `1`, `5`, `10` で成功すること、(6) `AgentRole` の 4 値が成功すること、(7) `Handoff`, `Classification`, `SlackNotification` スキーマの有効/無効テスト。この時点で `npm run test` を実行し、**すべて RED（失敗）** であることを確認する → `tests/unit/types.test.ts`
+- [x] T009 **RED テスト作成**: `tests/unit/types.test.ts` を作成し、test-cases.md の T-TYP-001〜T-TYP-016 の全 16 テストケースを記述する。具体的には: (1) `TaskType` の有効値 4 種が `safeParse` で成功すること、(2) `TaskType` の無効値 `"deploy"`, `""`, `null` が失敗すること、(3) `TaskStatus` の有効値 5 種が成功すること、(4) `CreateTaskInput` の必須フィールド `id`, `taskType`, `title`, `description`, `source` をそれぞれ 1 つずつ欠落させて失敗すること、(5) `priority` が `0` と `11` で失敗し `1`, `5`, `10` で成功すること、(6) `AgentRole` の 4 値が成功すること、(7) `Handoff`, `Classification`, `SlackNotification` スキーマの有効/無効テスト。この時点で `npm run test` を実行し、**すべて RED（失敗）** であることを確認する → `tests/unit/types.test.ts`
 
-- [ ] T010 **GREEN 実装**: `src/types.ts` を作成する。以下の Zod スキーマと型を定義する: `TaskType`, `TaskStatus`, `AgentRole`, `CreateTaskInput`, `Task`, `Handoff`, `Classification`, `SubTaskDef`, `SlackNotification`。data-model.md のフィールド定義に厳密に従う。`z.infer<typeof Schema>` で型を導出し、スキーマと型をペアで `export` する。`npm run test` を実行し、T009 の全テストが **GREEN（成功）** になることを確認する → `src/types.ts`
+- [x] T010 **GREEN 実装**: `src/types.ts` を作成する。以下の Zod スキーマと型を定義する: `TaskType`, `TaskStatus`, `AgentRole`, `CreateTaskInput`, `Task`, `Handoff`, `Classification`, `SubTaskDef`, `SlackNotification`。data-model.md のフィールド定義に厳密に従う。`z.infer<typeof Schema>` で型を導出し、スキーマと型をペアで `export` する。`npm run test` を実行し、T009 の全テストが **GREEN（成功）** になることを確認する → `src/types.ts`
 
 ### 2.2 環境変数バリデーション (`src/config/env-config.ts`)
 
 > **TDD サイクル**: テスト T011 → 実装 T012
 
-- [ ] T011 **RED テスト作成**: `tests/unit/config/env-config.test.ts` を作成し、test-cases.md の T-ENV-001〜T-ENV-014 の全 14 テストケース + 追加 2 ケースを記述する。具体的には: (1) Max プラン用の全必須変数セットで成功、(2) API 課金用の全必須変数セットで成功、(3) `GITHUB_TOKEN`, `PROJECT_DIR`, `WORKTREE_DIR`, `GITHUB_REPO` を個別に欠落させてエラー、(4) `ANTHROPIC_API_KEY` と `RATE_CONTROL_ENABLED=true` の同時設定でエラー、(5) `DAILY_BUDGET_USD=-5` でエラー、(6) `MAX_CONCURRENT=0` でエラー、(7) `MAX_CONCURRENT` 未設定でデフォルト `1`、(8) `SLACK_WEBHOOK_URL` 未設定で成功、(9) `SLACK_WEBHOOK_URL="not-a-url"` でエラー、(10) `GITHUB_REPO="invalid"` でエラー、**(11) `MAX_TASKS_PER_WINDOW` 未設定でデフォルト `150`、(12) `RATE_LIMIT_WARN_THRESHOLD` 未設定でデフォルト `0.1`（10%）**。テスト内では `process.env` をモックする。`npm run test` で **RED** を確認 → `tests/unit/config/env-config.test.ts`
+- [x] T011 **RED テスト作成**: `tests/unit/config/env-config.test.ts` を作成し、test-cases.md の T-ENV-001〜T-ENV-014 の全 14 テストケース + 追加 2 ケースを記述する。具体的には: (1) Max プラン用の全必須変数セットで成功、(2) API 課金用の全必須変数セットで成功、(3) `GITHUB_TOKEN`, `PROJECT_DIR`, `WORKTREE_DIR`, `GITHUB_REPO` を個別に欠落させてエラー、(4) `ANTHROPIC_API_KEY` と `RATE_CONTROL_ENABLED=true` の同時設定でエラー、(5) `DAILY_BUDGET_USD=-5` でエラー、(6) `MAX_CONCURRENT=0` でエラー、(7) `MAX_CONCURRENT` 未設定でデフォルト `1`、(8) `SLACK_WEBHOOK_URL` 未設定で成功、(9) `SLACK_WEBHOOK_URL="not-a-url"` でエラー、(10) `GITHUB_REPO="invalid"` でエラー、**(11) `MAX_TASKS_PER_WINDOW` 未設定でデフォルト `150`、(12) `RATE_LIMIT_WARN_THRESHOLD` 未設定でデフォルト `0.1`（10%）**。テスト内では `process.env` をモックする。`npm run test` で **RED** を確認 → `tests/unit/config/env-config.test.ts`
 
-- [ ] T012 **GREEN 実装**: `src/config/env-config.ts` を作成する。Zod スキーマ `EnvConfig` を定義し、`loadConfig()` 関数で `process.env` をバリデーションする。`ANTHROPIC_API_KEY` と `RATE_CONTROL_ENABLED=true` の相互排他チェックを `refine()` で実装する。`GITHUB_REPO` の `owner/repo` 形式を `regex` でバリデーションする。`npm run test` で **GREEN** を確認 → `src/config/env-config.ts`
+- [x] T012 **GREEN 実装**: `src/config/env-config.ts` を作成する。Zod スキーマ `EnvConfig` を定義し、`loadConfig()` 関数で `process.env` をバリデーションする。`ANTHROPIC_API_KEY` と `RATE_CONTROL_ENABLED=true` の相互排他チェックを `refine()` で実装する。`GITHUB_REPO` の `owner/repo` 形式を `regex` でバリデーションする。`npm run test` で **GREEN** を確認 → `src/config/env-config.ts`
 
 ### 2.3 ロガー (`src/logging/logger.ts`)
 
 > **TDD サイクル**: テスト T013 → 実装 T014
 
-- [ ] T013 **RED テスト作成**: `tests/unit/logging/logger.test.ts` を作成し、test-cases.md の T-LOG-001〜T-LOG-006 の 6 テストケースを記述する。(1) `createLogger()` が pino インスタンスを返す、(2) `logger.child({ taskId: "gh-42", agentRole: "reviewer" })` で子ロガーのログ出力に `taskId` と `agentRole` が含まれる、(3) ログ出力が JSON Lines 形式（各行が有効な JSON）である。pino の出力先をメモリストリームにリダイレクトしてテストする → `tests/unit/logging/logger.test.ts`
+- [x] T013 **RED テスト作成**: `tests/unit/logging/logger.test.ts` を作成し、test-cases.md の T-LOG-001〜T-LOG-006 の 6 テストケースを記述する。(1) `createLogger()` が pino インスタンスを返す、(2) `logger.child({ taskId: "gh-42", agentRole: "reviewer" })` で子ロガーのログ出力に `taskId` と `agentRole` が含まれる、(3) ログ出力が JSON Lines 形式（各行が有効な JSON）である。pino の出力先をメモリストリームにリダイレクトしてテストする → `tests/unit/logging/logger.test.ts`
 
-- [ ] T014 **GREEN 実装**: `src/logging/logger.ts` を作成する。`pino` をインポートし、`createLogger(options?)` 関数を export する。ログレベルは環境変数 `LOG_LEVEL` で設定可能（デフォルト: `"info"`）。ファイル出力先は `logs/YYYY-MM-DD.jsonl` → `src/logging/logger.ts`
+- [x] T014 **GREEN 実装**: `src/logging/logger.ts` を作成する。`pino` をインポートし、`createLogger(options?)` 関数を export する。ログレベルは環境変数 `LOG_LEVEL` で設定可能（デフォルト: `"info"`）。ファイル出力先は `logs/YYYY-MM-DD.jsonl` → `src/logging/logger.ts`
 
 ### 2.4 ログローテーション (`src/logging/log-rotation.ts`)
 
 > **TDD サイクル**: テスト T015 → 実装 T016
 
-- [ ] T015 **RED テスト作成**: `tests/unit/logging/log-rotation.test.ts` を作成し、test-cases.md の T-LR-001〜T-LR-005 の 5 テストケースを記述する。テスト用の一時ディレクトリを作成し、(1) 29 日前の `.jsonl` ファイルが保持される、(2) 31 日前の `.jsonl` ファイルが削除される、(3) 空ディレクトリでエラーなし、(4) `.txt` ファイルは削除されない、(5) ディレクトリ不在時にディレクトリが自動作成される → `tests/unit/logging/log-rotation.test.ts`
+- [x] T015 **RED テスト作成**: `tests/unit/logging/log-rotation.test.ts` を作成し、test-cases.md の T-LR-001〜T-LR-005 の 5 テストケースを記述する。テスト用の一時ディレクトリを作成し、(1) 29 日前の `.jsonl` ファイルが保持される、(2) 31 日前の `.jsonl` ファイルが削除される、(3) 空ディレクトリでエラーなし、(4) `.txt` ファイルは削除されない、(5) ディレクトリ不在時にディレクトリが自動作成される → `tests/unit/logging/log-rotation.test.ts`
 
-- [ ] T016 **GREEN 実装**: `src/logging/log-rotation.ts` を作成する。`rotateOldLogs(logDir: string, retentionDays: number = 30)` 関数を export する。`node:fs` でファイル一覧を取得し、`.jsonl` 拡張子かつ `retentionDays` 日より古いファイルを `unlinkSync` で削除する → `src/logging/log-rotation.ts`
+- [x] T016 **GREEN 実装**: `src/logging/log-rotation.ts` を作成する。`rotateOldLogs(logDir: string, retentionDays: number = 30)` 関数を export する。`node:fs` でファイル一覧を取得し、`.jsonl` 拡張子かつ `retentionDays` 日より古いファイルを `unlinkSync` で削除する → `src/logging/log-rotation.ts`
 
 ### 2.5 DB スキーマ (`src/queue/schema.ts`)
 
 > **TDD サイクル**: テスト T017 → 実装 T018
 
-- [ ] T017 **RED テスト作成**: `tests/unit/queue/schema.test.ts` を作成し、test-cases.md の T-SCH-001〜T-SCH-011 の全 11 テストケースを記述する。`better-sqlite3` の `:memory:` DB を各テストの `beforeEach` で生成する。(1) `initSchema(db)` 後に `tasks` テーブルが存在する（`SELECT name FROM sqlite_master`）、(2) `PRAGMA journal_mode` が `wal` を返す、(3) 4 つのインデックスが存在する、(4) 二重 `initSchema()` でエラーなし、(5) 無効な `task_type` INSERT で SQLITE_CONSTRAINT、(6) 無効な `status` で CONSTRAINT、(7) `priority=0` と `priority=11` で CONSTRAINT、(8) `retry_count=4` で CONSTRAINT、(9) `priority` 未指定で `5` がデフォルト、(10) `status` 未指定で `"pending"`、(11) `created_at` が自動設定 → `tests/unit/queue/schema.test.ts`
+- [x] T017 **RED テスト作成**: `tests/unit/queue/schema.test.ts` を作成し、test-cases.md の T-SCH-001〜T-SCH-011 の全 11 テストケースを記述する。`better-sqlite3` の `:memory:` DB を各テストの `beforeEach` で生成する。(1) `initSchema(db)` 後に `tasks` テーブルが存在する（`SELECT name FROM sqlite_master`）、(2) `PRAGMA journal_mode` が `wal` を返す、(3) 4 つのインデックスが存在する、(4) 二重 `initSchema()` でエラーなし、(5) 無効な `task_type` INSERT で SQLITE_CONSTRAINT、(6) 無効な `status` で CONSTRAINT、(7) `priority=0` と `priority=11` で CONSTRAINT、(8) `retry_count=4` で CONSTRAINT、(9) `priority` 未指定で `5` がデフォルト、(10) `status` 未指定で `"pending"`、(11) `created_at` が自動設定 → `tests/unit/queue/schema.test.ts`
 
-- [ ] T018 **GREEN 実装**: `src/queue/schema.ts` を作成する。`initSchema(db: Database)` 関数を export する。`db.pragma('journal_mode = WAL')` を実行し、data-model.md の SQL スキーマ（CREATE TABLE + CREATE INDEX × 4）をそのまま `db.exec()` で実行する → `src/queue/schema.ts`
+- [x] T018 **GREEN 実装**: `src/queue/schema.ts` を作成する。`initSchema(db: Database)` 関数を export する。`db.pragma('journal_mode = WAL')` を実行し、data-model.md の SQL スキーマ（CREATE TABLE + CREATE INDEX × 4）をそのまま `db.exec()` で実行する → `src/queue/schema.ts`
 
 ### 2.6 DB マイグレーション (`src/queue/migrations.ts`)
 
 > **TDD サイクル**: テスト T019 → 実装 T020
 
-- [ ] T019 **RED テスト作成**: `tests/unit/queue/migrations.test.ts` を作成し、test-cases.md の T-MIG-001〜T-MIG-003 の 3 テストケースを記述する → `tests/unit/queue/migrations.test.ts`
+- [x] T019 **RED テスト作成**: `tests/unit/queue/migrations.test.ts` を作成し、test-cases.md の T-MIG-001〜T-MIG-003 の 3 テストケースを記述する → `tests/unit/queue/migrations.test.ts`
 
-- [ ] T020 **GREEN 実装**: `src/queue/migrations.ts` を作成する。`schema_version` テーブルでバージョン管理し、差分マイグレーションを適用する `runMigrations(db: Database)` を export する → `src/queue/migrations.ts`
+- [x] T020 **GREEN 実装**: `src/queue/migrations.ts` を作成する。`schema_version` テーブルでバージョン管理し、差分マイグレーションを適用する `runMigrations(db: Database)` を export する → `src/queue/migrations.ts`
 
 ### 2.7 タスクキュー (`src/queue/task-queue.ts`)
 
 > **TDD サイクル**: テスト T021 → 実装 T022
 
-- [ ] T021 **RED テスト作成**: `tests/unit/queue/task-queue.test.ts` を作成し、test-cases.md の T-TQ-001〜T-TQ-029 の全 29 テストケースを記述する。`:memory:` DB + `initSchema()` を `beforeEach` で初期化する。テストケースは以下のグループに分ける: **追加**（T-TQ-001〜004）: 単体追加、依存関係付き追加、重複 ID エラー、パイプライン一括追加。**次タスク取得**（T-TQ-005〜012）: 空キュー→null、優先度順、作成日順、依存タスク未完了でスキップ、完了で取得、failed でスキップ、awaiting_approval でスキップ。**ステータス更新**（T-TQ-013〜019）: 全 7 状態遷移パス。**クラッシュ復旧**（T-TQ-020〜023）: in_progress リセット、retry 超過→failed、awaiting_approval 不変、completed 不変。**クエリ・集計**（T-TQ-024〜029）: 冪等性、フィルタ、集計、一括キャンセル、トランザクション原子性 → `tests/unit/queue/task-queue.test.ts`
+- [x] T021 **RED テスト作成**: `tests/unit/queue/task-queue.test.ts` を作成し、test-cases.md の T-TQ-001〜T-TQ-029 の全 29 テストケースを記述する。`:memory:` DB + `initSchema()` を `beforeEach` で初期化する。テストケースは以下のグループに分ける: **追加**（T-TQ-001〜004）: 単体追加、依存関係付き追加、重複 ID エラー、パイプライン一括追加。**次タスク取得**（T-TQ-005〜012）: 空キュー→null、優先度順、作成日順、依存タスク未完了でスキップ、完了で取得、failed でスキップ、awaiting_approval でスキップ。**ステータス更新**（T-TQ-013〜019）: 全 7 状態遷移パス。**クラッシュ復旧**（T-TQ-020〜023）: in_progress リセット、retry 超過→failed、awaiting_approval 不変、completed 不変。**クエリ・集計**（T-TQ-024〜029）: 冪等性、フィルタ、集計、一括キャンセル、トランザクション原子性 → `tests/unit/queue/task-queue.test.ts`
 
-- [ ] T022 **GREEN 実装**: `src/queue/task-queue.ts` を作成する。`TaskQueue` クラスを export し、以下のメソッドを実装する: `push(input: CreateTaskInput)`, `pushPipeline(tasks: CreateTaskInput[])`, `getNext(): Task | null`, `updateStatus(id, status, data?)`, `recoverFromCrash()`, `getByStatus(status)`, `getAwaitingApproval()`, `getDailyDigest()`, `cancelPipelineSuccessors(parentTaskId)`, `isDuplicate(source)`. すべてのメソッドでプリペアドステートメント（`db.prepare()`）を使用する。書き込み操作は `db.transaction()` でラップする → `src/queue/task-queue.ts`
+- [x] T022 **GREEN 実装**: `src/queue/task-queue.ts` を作成する。`TaskQueue` クラスを export し、以下のメソッドを実装する: `push(input: CreateTaskInput)`, `pushPipeline(tasks: CreateTaskInput[])`, `getNext(): Task | null`, `updateStatus(id, status, data?)`, `recoverFromCrash()`, `getByStatus(status)`, `getAwaitingApproval()`, `getDailyDigest()`, `cancelPipelineSuccessors(parentTaskId)`, `isDuplicate(source)`. すべてのメソッドでプリペアドステートメント（`db.prepare()`）を使用する。書き込み操作は `db.transaction()` でラップする → `src/queue/task-queue.ts`
 
 ### 2.8 エージェント設定 (`src/agents/agent-config.ts`)
 
 > **TDD サイクル**: テスト T023 → 実装 T024
 
-- [ ] T023 **RED テスト作成**: `tests/unit/agents/agent-config.test.ts` を作成し、test-cases.md の T-AC-001〜T-AC-007 の 7 テストケースを記述する。(1)〜(4) 各エージェント（reviewer, fixer, builder, scribe）の設定値（allowedTools, permissionMode, maxTurns, maxBudgetUsd, timeoutMs）が data-model.md の表と一致することを検証。(5) 無効ロール `"hacker"` でエラー。(6)(7) Reviewer と Scribe の allowedTools に `Bash` で始まる文字列が含まれないことを検証 → `tests/unit/agents/agent-config.test.ts`
+- [x] T023 **RED テスト作成**: `tests/unit/agents/agent-config.test.ts` を作成し、test-cases.md の T-AC-001〜T-AC-007 の 7 テストケースを記述する。(1)〜(4) 各エージェント（reviewer, fixer, builder, scribe）の設定値（allowedTools, permissionMode, maxTurns, maxBudgetUsd, timeoutMs）が data-model.md の表と一致することを検証。(5) 無効ロール `"hacker"` でエラー。(6)(7) Reviewer と Scribe の allowedTools に `Bash` で始まる文字列が含まれないことを検証 → `tests/unit/agents/agent-config.test.ts`
 
-- [ ] T024 **GREEN 実装**: `src/agents/agent-config.ts` を作成する。`AgentConfig` を `as const` オブジェクトで 4 エージェント分定義し、`getAgentConfig(role: AgentRole): AgentConfig` 関数を export する。data-model.md のエージェント設定値テーブルに完全一致させる → `src/agents/agent-config.ts`
+- [x] T024 **GREEN 実装**: `src/agents/agent-config.ts` を作成する。`AgentConfig` を `as const` オブジェクトで 4 エージェント分定義し、`getAgentConfig(role: AgentRole): AgentConfig` 関数を export する。data-model.md のエージェント設定値テーブルに完全一致させる → `src/agents/agent-config.ts`
 
 ### 2.9 Slack 通知 (`src/notifications/slack-notifier.ts`)
 
 > **TDD サイクル**: テスト T025 → 実装 T026
 
-- [ ] T025 **RED テスト作成**: `tests/unit/notifications/slack-notifier.test.ts` を作成し、test-cases.md の T-SN-001〜T-SN-010 の全 10 テストケースを記述する。`globalThis.fetch` をモックする。(1) info/warn/error の各レベルで HTTP POST が正しい色（緑/黄/赤）で送信される、(2) Webhook URL 未設定で送信スキップ、(3) HTTP 500 でエラーログのみ（例外を投げない）、(4) ネットワークエラーで例外を投げない、(5) Daily digest の body フォーマット、(6) fields が空でも送信成功、(7) approval_requested に PR URL 含む、(8) contracts/slack-events.md の全 12 イベントのフォーマット検証 → `tests/unit/notifications/slack-notifier.test.ts`
+- [x] T025 **RED テスト作成**: `tests/unit/notifications/slack-notifier.test.ts` を作成し、test-cases.md の T-SN-001〜T-SN-010 の全 10 テストケースを記述する。`globalThis.fetch` をモックする。(1) info/warn/error の各レベルで HTTP POST が正しい色（緑/黄/赤）で送信される、(2) Webhook URL 未設定で送信スキップ、(3) HTTP 500 でエラーログのみ（例外を投げない）、(4) ネットワークエラーで例外を投げない、(5) Daily digest の body フォーマット、(6) fields が空でも送信成功、(7) approval_requested に PR URL 含む、(8) contracts/slack-events.md の全 12 イベントのフォーマット検証 → `tests/unit/notifications/slack-notifier.test.ts`
 
-- [ ] T026 **GREEN 実装**: `src/notifications/slack-notifier.ts` を作成する。`SlackNotifier` クラスを export する。`constructor(webhookUrl?: string)` で URL を受け取り、`send(notification: SlackNotification)` で `fetch()` による HTTP POST を実行する。通知レベルに応じた Slack attachment color を設定する。URL 未設定時は何もしない。HTTP エラー・ネットワークエラーはログに記録し、例外を投げない → `src/notifications/slack-notifier.ts`
+- [x] T026 **GREEN 実装**: `src/notifications/slack-notifier.ts` を作成する。`SlackNotifier` クラスを export する。`constructor(webhookUrl?: string)` で URL を受け取り、`send(notification: SlackNotification)` で `fetch()` による HTTP POST を実行する。通知レベルに応じた Slack attachment color を設定する。URL 未設定時は何もしない。HTTP エラー・ネットワークエラーはログに記録し、例外を投げない → `src/notifications/slack-notifier.ts`
 
 **Checkpoint**: `npm run test` で Phase 2 の全テスト（16+14+6+5+11+3+29+7+10 = 101 件）が GREEN。`npm run typecheck` と `npm run lint` がエラーゼロ。
 
