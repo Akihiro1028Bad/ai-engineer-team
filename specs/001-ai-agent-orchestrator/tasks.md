@@ -22,21 +22,21 @@
 
 **Purpose**: TypeScript プロジェクトの骨格を作成し、ビルド・テスト・Lint が動く状態にする
 
-- [ ] T001 `package.json` を作成する。`name: "ai-agent-orchestrator"`, `type: "module"` を設定し、以下の dependencies を追加: `@anthropic-ai/claude-agent-sdk`, `better-sqlite3`, `zod`, `pino`, `@octokit/rest`。devDependencies: `typescript`, `vitest`, `@typescript-eslint/eslint-plugin`, `@typescript-eslint/parser`, `eslint`, `@types/better-sqlite3`。scripts に `build`, `dev`, `start`, `test`, `lint`, `typecheck` を定義する → `package.json`
+- [x] T001 `package.json` を作成する。`name: "ai-agent-orchestrator"`, `type: "module"` を設定し、以下の dependencies を追加: `@anthropic-ai/claude-agent-sdk`, `better-sqlite3`, `zod`, `pino`, `@octokit/rest`。devDependencies: `typescript`, `vitest`, `@typescript-eslint/eslint-plugin`, `@typescript-eslint/parser`, `eslint`, `@types/better-sqlite3`。scripts に `build`, `dev`, `start`, `test`, `lint`, `typecheck` を定義する → `package.json`
 
-- [ ] T002 `tsconfig.json` を作成する。`strict: true`, `target: "ES2022"`, `module: "Node16"`, `moduleResolution: "Node16"`, `outDir: "./dist"`, `rootDir: "./src"`, `declaration: true`, `sourceMap: true` を設定する → `tsconfig.json`
+- [x] T002 `tsconfig.json` を作成する。`strict: true`, `target: "ES2022"`, `module: "Node16"`, `moduleResolution: "Node16"`, `outDir: "./dist"`, `rootDir: "./src"`, `declaration: true`, `sourceMap: true` を設定する → `tsconfig.json`
 
-- [ ] T003 [P] ESLint 設定ファイルを作成する。`typescript-eslint` の `strictTypeChecked` を extends し、`@typescript-eslint/no-explicit-any: "error"`, `@typescript-eslint/no-floating-promises: "error"`, `@typescript-eslint/no-unused-vars` で `_` プレフィックス許可を設定する → `eslint.config.mjs`
+- [x] T003 [P] ESLint 設定ファイルを作成する。`typescript-eslint` の `strictTypeChecked` を extends し、`@typescript-eslint/no-explicit-any: "error"`, `@typescript-eslint/no-floating-promises: "error"`, `@typescript-eslint/no-unused-vars` で `_` プレフィックス許可を設定する → `eslint.config.mjs`
 
-- [ ] T004 [P] Vitest 設定ファイルを作成する。`globals: true`, `environment: "node"`, TypeScript パスエイリアスの設定、カバレッジレポーター（`text`, `lcov`）を設定し、`coverage.thresholds` で `statements: 100, branches: 100, functions: 100, lines: 100` を設定する → `vitest.config.ts`
+- [x] T004 [P] Vitest 設定ファイルを作成する。`globals: true`, `environment: "node"`, TypeScript パスエイリアスの設定、カバレッジレポーター（`text`, `lcov`）を設定し、`coverage.thresholds` で `statements: 100, branches: 100, functions: 100, lines: 100` を設定する → `vitest.config.ts`
 
-- [ ] T005 [P] `.env.example` を作成する。全環境変数をコメント付きで記載する（`RATE_CONTROL_ENABLED`, `RATE_COOLDOWN_SECONDS`, `MAX_TASKS_PER_WINDOW`, `RATE_LIMIT_WARN_THRESHOLD`, `GITHUB_TOKEN`, `GITHUB_REPO`, `PROJECT_DIR`, `WORKTREE_DIR`, `SLACK_WEBHOOK_URL`, `DAILY_BUDGET_USD`, `MAX_CONCURRENT`）。**実際の値は含めないこと** → `.env.example`
+- [x] T005 [P] `.env.example` を作成する。全環境変数をコメント付きで記載する（`RATE_CONTROL_ENABLED`, `RATE_COOLDOWN_SECONDS`, `MAX_TASKS_PER_WINDOW`, `RATE_LIMIT_WARN_THRESHOLD`, `GITHUB_TOKEN`, `GITHUB_REPO`, `PROJECT_DIR`, `WORKTREE_DIR`, `SLACK_WEBHOOK_URL`, `DAILY_BUDGET_USD`, `MAX_CONCURRENT`）。**実際の値は含めないこと** → `.env.example`
 
-- [ ] T006 [P] `.gitignore` に `node_modules/`, `dist/`, `.env`, `tasks.db`, `logs/`, `coverage/` を追加する → `.gitignore`
+- [x] T006 [P] `.gitignore` に `node_modules/`, `dist/`, `.env`, `tasks.db`, `logs/`, `coverage/` を追加する → `.gitignore`
 
-- [ ] T007 `npm install` を実行し、依存関係をインストールする。`npm run build` でコンパイルエラーがないことを確認する。`npm run test` で Vitest が起動することを確認する（テストファイルがないため 0 件パスで OK）
+- [x] T007 `npm install` を実行し、依存関係をインストールする。`npm run build` でコンパイルエラーがないことを確認する。`npm run test` で Vitest が起動することを確認する（テストファイルがないため 0 件パスで OK）
 
-- [ ] T008 plan.md のディレクトリ構成に従い、空の `src/` サブディレクトリを作成する: `src/agents/`, `src/queue/`, `src/sources/`, `src/bridges/`, `src/safety/`, `src/notifications/`, `src/logging/`, `src/config/`。同様に `tests/unit/queue/`, `tests/unit/safety/`, `tests/unit/agents/`, `tests/unit/notifications/`, `tests/unit/sources/`, `tests/unit/bridges/`, `tests/unit/logging/`, `tests/unit/config/`, `tests/integration/`, `tests/contract/` を作成する
+- [x] T008 plan.md のディレクトリ構成に従い、空の `src/` サブディレクトリを作成する: `src/agents/`, `src/queue/`, `src/sources/`, `src/bridges/`, `src/safety/`, `src/notifications/`, `src/logging/`, `src/config/`。同様に `tests/unit/queue/`, `tests/unit/safety/`, `tests/unit/agents/`, `tests/unit/notifications/`, `tests/unit/sources/`, `tests/unit/bridges/`, `tests/unit/logging/`, `tests/unit/config/`, `tests/integration/`, `tests/contract/` を作成する
 
 **Checkpoint**: `npm run build`, `npm run test`, `npm run lint`, `npm run typecheck` がすべてエラーなしで実行できる
 

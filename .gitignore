@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+tasks.db
+logs/
+coverage/
+*.log
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp

@@ -1,0 +1,40 @@
+{
+  "name": "ai-agent-orchestrator",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "AI Agent Team Orchestrator — 4つの専門AIエージェントを統括し、開発タスクを自律的に処理するシステム",
+  "main": "dist/src/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/src/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src/ tests/",
+    "typecheck": "tsc --noEmit",
+    "task:add": "node dist/src/sources/manual-cli.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.1.0",
+    "@octokit/rest": "^21.0.0",
+    "better-sqlite3": "^11.0.0",
+    "pino": "^9.0.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.0",
+    "@types/node": "^22.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.6.0",
+    "typescript-eslint": "^8.0.0",
+    "vitest": "^2.0.0",
+    "@vitest/coverage-v8": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}
