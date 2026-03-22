@@ -132,49 +132,49 @@
 
 ### テスト作成（RED）
 
-- [ ] T027 [P] [US1] **RED テスト**: `tests/unit/agents/dispatcher.test.ts` を作成し、test-cases.md の T-DSP-001〜T-DSP-015 の全 15 テストケースを記述する。`@anthropic-ai/claude-agent-sdk` の `query` 関数をモックする。(1) success ResultMessage でタスク completed、costUsd/turnsUsed 記録、(2) 構造化出力の Zod バリデーション成功/失敗、(3) error_max_turns/error_max_budget_usd/error_during_execution の各パターンで failed/retry、(4) AbortController タイムアウト（timeoutMs=100 で 200ms のモック）、(5) query() 例外スロー、(6) AbortController クリーンアップ、(7) allowedTools と cwd が正しく渡される、(8) パイプライン review 完了後に awaiting_approval 遷移、(9) 単体 review 完了後に completed、(10) dependsOn あり/なしで handoff 挿入有無。`npm run test` で **RED** を確認 → `tests/unit/agents/dispatcher.test.ts`
+- [x] T027 [P] [US1] **RED テスト**: `tests/unit/agents/dispatcher.test.ts` を作成し、test-cases.md の T-DSP-001〜T-DSP-015 の全 15 テストケースを記述する。`@anthropic-ai/claude-agent-sdk` の `query` 関数をモックする。(1) success ResultMessage でタスク completed、costUsd/turnsUsed 記録、(2) 構造化出力の Zod バリデーション成功/失敗、(3) error_max_turns/error_max_budget_usd/error_during_execution の各パターンで failed/retry、(4) AbortController タイムアウト（timeoutMs=100 で 200ms のモック）、(5) query() 例外スロー、(6) AbortController クリーンアップ、(7) allowedTools と cwd が正しく渡される、(8) パイプライン review 完了後に awaiting_approval 遷移、(9) 単体 review 完了後に completed、(10) dependsOn あり/なしで handoff 挿入有無。`npm run test` で **RED** を確認 → `tests/unit/agents/dispatcher.test.ts`
 
-- [ ] T028 [P] [US1] **RED テスト**: `tests/unit/bridges/context-bridge.test.ts` を作成し、test-cases.md の T-CB-001〜T-CB-006 の 6 テストケースを記述する。テスト用一時ディレクトリを使う。(1) Handoff JSON 書き込み→ファイル存在、(2) 読み込み→パース成功、(3) 不在ファイル→null、(4) 壊れた JSON→バリデーション失敗+ログ、(5) ディレクトリ不在→自動作成、(6) プロンプト挿入テキスト生成 → `tests/unit/bridges/context-bridge.test.ts`
+- [x] T028 [P] [US1] **RED テスト**: `tests/unit/bridges/context-bridge.test.ts` を作成し、test-cases.md の T-CB-001〜T-CB-006 の 6 テストケースを記述する。テスト用一時ディレクトリを使う。(1) Handoff JSON 書き込み→ファイル存在、(2) 読み込み→パース成功、(3) 不在ファイル→null、(4) 壊れた JSON→バリデーション失敗+ログ、(5) ディレクトリ不在→自動作成、(6) プロンプト挿入テキスト生成 → `tests/unit/bridges/context-bridge.test.ts`
 
-- [ ] T029 [P] [US1] **RED テスト**: `tests/unit/sources/cron-scheduler.test.ts` を作成し、test-cases.md の T-CRN-001〜T-CRN-005 の 5 テストケースを記述する。(1) 03:00 で review タスク生成、(2) 月曜 09:00 で document タスク生成、(3) 15:00 で生成なし、(4) ID が `cron-{type}-{MMDD}` 形式、(5) 同日重複で冪等スキップ → `tests/unit/sources/cron-scheduler.test.ts`
+- [x] T029 [P] [US1] **RED テスト**: `tests/unit/sources/cron-scheduler.test.ts` を作成し、test-cases.md の T-CRN-001〜T-CRN-005 の 5 テストケースを記述する。(1) 03:00 で review タスク生成、(2) 月曜 09:00 で document タスク生成、(3) 15:00 で生成なし、(4) ID が `cron-{type}-{MMDD}` 形式、(5) 同日重複で冪等スキップ → `tests/unit/sources/cron-scheduler.test.ts`
 
-- [ ] T030 [P] [US1] **RED テスト**: `tests/unit/sources/manual-cli.test.ts` を作成し、test-cases.md の T-CLI-001〜T-CLI-006 の 6 テストケースを記述する。(1) 必須引数で成功、(2) --type 未指定でエラー、(3) 無効 type でエラー、(4) --priority 設定、(5) ID 形式 `manual-{連番}`、(6) --depends-on 設定 → `tests/unit/sources/manual-cli.test.ts`
+- [x] T030 [P] [US1] **RED テスト**: `tests/unit/sources/manual-cli.test.ts` を作成し、test-cases.md の T-CLI-001〜T-CLI-006 の 6 テストケースを記述する。(1) 必須引数で成功、(2) --type 未指定でエラー、(3) 無効 type でエラー、(4) --priority 設定、(5) ID 形式 `manual-{連番}`、(6) --depends-on 設定 → `tests/unit/sources/manual-cli.test.ts`
 
-- [ ] T031 [P] [US1] **RED テスト**: `tests/unit/safety/rate-controller.test.ts` を作成し、test-cases.md の T-RC2-001〜T-RC2-008 の 8 テストケースを記述する。(1) enabled=false でスルー、(2) クールダウン挿入、(3) クールダウン不要、(4) ウィンドウ上限到達、(5) 5h リセット、(6) カウント増加、(7) Rate limit 接近通知、(8) lastTaskTime 更新。時間依存のテストは `vi.useFakeTimers()` を使用する → `tests/unit/safety/rate-controller.test.ts`
+- [x] T031 [P] [US1] **RED テスト**: `tests/unit/safety/rate-controller.test.ts` を作成し、test-cases.md の T-RC2-001〜T-RC2-008 の 8 テストケースを記述する。(1) enabled=false でスルー、(2) クールダウン挿入、(3) クールダウン不要、(4) ウィンドウ上限到達、(5) 5h リセット、(6) カウント増加、(7) Rate limit 接近通知、(8) lastTaskTime 更新。時間依存のテストは `vi.useFakeTimers()` を使用する → `tests/unit/safety/rate-controller.test.ts`
 
-- [ ] T032 [P] [US1] **RED テスト**: `tests/unit/safety/circuit-breaker.test.ts` を作成し、test-cases.md の T-CB2-001〜T-CB2-010 の 10 テストケースを記述する。(1) 初期 CLOSED、(2) 成功でリセット、(3) 失敗でカウント増加、(4) 5 回連続で OPEN、(5) OPEN で拒否、(6) 1h 後 HALF_OPEN、(7) HALF_OPEN 成功→CLOSED、(8) HALF_OPEN 失敗→OPEN、(9) 成功挟み、(10) remainingMs → `tests/unit/safety/circuit-breaker.test.ts`
+- [x] T032 [P] [US1] **RED テスト**: `tests/unit/safety/circuit-breaker.test.ts` を作成し、test-cases.md の T-CB2-001〜T-CB2-010 の 10 テストケースを記述する。(1) 初期 CLOSED、(2) 成功でリセット、(3) 失敗でカウント増加、(4) 5 回連続で OPEN、(5) OPEN で拒否、(6) 1h 後 HALF_OPEN、(7) HALF_OPEN 成功→CLOSED、(8) HALF_OPEN 失敗→OPEN、(9) 成功挟み、(10) remainingMs → `tests/unit/safety/circuit-breaker.test.ts`
 
-- [ ] T033 [P] [US1] **RED テスト**: `tests/unit/safety/budget-guard.test.ts` を作成し、test-cases.md の T-BG-001〜T-BG-006 の 6 テストケースを記述する → `tests/unit/safety/budget-guard.test.ts`
+- [x] T033 [P] [US1] **RED テスト**: `tests/unit/safety/budget-guard.test.ts` を作成し、test-cases.md の T-BG-001〜T-BG-006 の 6 テストケースを記述する → `tests/unit/safety/budget-guard.test.ts`
 
 ### 実装（GREEN）
 
-- [ ] T034 [US1] **GREEN 実装**: `src/bridges/context-bridge.ts` を作成する。`writeHandoff(handoff: Handoff, dir: string)` と `readHandoff(taskId: string, agent: string, dir: string): Handoff | null` と `buildPromptInsert(handoff: Handoff): string` を export する。`node:fs` でファイル読み書きし、Zod でバリデーション。T028 が GREEN になることを確認 → `src/bridges/context-bridge.ts`
+- [x] T034 [US1] **GREEN 実装**: `src/bridges/context-bridge.ts` を作成する。`writeHandoff(handoff: Handoff, dir: string)` と `readHandoff(taskId: string, agent: string, dir: string): Handoff | null` と `buildPromptInsert(handoff: Handoff): string` を export する。`node:fs` でファイル読み書きし、Zod でバリデーション。T028 が GREEN になることを確認 → `src/bridges/context-bridge.ts`
 
-- [ ] T035 [US1] **GREEN 実装**: `src/safety/rate-controller.ts` を作成する。`RateController` クラスを export する。`constructor(enabled, cooldownMs, maxTasksPerWindow)` で設定を受け取り、`waitIfNeeded(): Promise<void>` で クールダウン挿入 + ウィンドウ上限チェックを行う。`SlackNotifier` への依存を注入する。T031 が GREEN になることを確認 → `src/safety/rate-controller.ts`
+- [x] T035 [US1] **GREEN 実装**: `src/safety/rate-controller.ts` を作成する。`RateController` クラスを export する。`constructor(enabled, cooldownMs, maxTasksPerWindow)` で設定を受け取り、`waitIfNeeded(): Promise<void>` で クールダウン挿入 + ウィンドウ上限チェックを行う。`SlackNotifier` への依存を注入する。T031 が GREEN になることを確認 → `src/safety/rate-controller.ts`
 
-- [ ] T036 [US1] **GREEN 実装**: `src/safety/circuit-breaker.ts` を作成する。`CircuitBreaker` クラスを export する。状態（CLOSED/OPEN/HALF_OPEN）を管理し、`recordSuccess()`, `recordFailure()`, `canExecute(): boolean`, `getRemainingMs(): number` メソッドを提供する。T032 が GREEN になることを確認 → `src/safety/circuit-breaker.ts`
+- [x] T036 [US1] **GREEN 実装**: `src/safety/circuit-breaker.ts` を作成する。`CircuitBreaker` クラスを export する。状態（CLOSED/OPEN/HALF_OPEN）を管理し、`recordSuccess()`, `recordFailure()`, `canExecute(): boolean`, `getRemainingMs(): number` メソッドを提供する。T032 が GREEN になることを確認 → `src/safety/circuit-breaker.ts`
 
-- [ ] T037 [US1] **GREEN 実装**: `src/safety/budget-guard.ts` を作成する。`BudgetGuard` クラスを export する。`canExecute(): boolean` と `recordCost(usd: number)` を提供する。T033 が GREEN になることを確認 → `src/safety/budget-guard.ts`
+- [x] T037 [US1] **GREEN 実装**: `src/safety/budget-guard.ts` を作成する。`BudgetGuard` クラスを export する。`canExecute(): boolean` と `recordCost(usd: number)` を提供する。T033 が GREEN になることを確認 → `src/safety/budget-guard.ts`
 
 - [ ] T037a [P] [US1] **RED テスト**: `tests/unit/agents/worktree-manager.test.ts` を作成する。(1) worktree が存在しない場合に `git worktree add` で作成される、(2) タスク用ブランチ `agent/{role}/{taskId}` が作成される、(3) 既存の worktree がある場合は再利用（新ブランチのみ作成）、(4) 前回タスクの残骸ブランチが存在する場合はクリーンアップ後に新ブランチ作成、(5) タスク完了後に worktree 内の未コミット変更がない場合はブランチ削除。`child_process.execSync` をモックする → `tests/unit/agents/worktree-manager.test.ts`
 
 - [ ] T037b [US1] **GREEN 実装**: `src/agents/worktree-manager.ts` を作成する。`WorktreeManager` クラスを export する。`prepare(role: AgentRole, taskId: string): string` で worktree パスを返す（存在確認→ブランチ作成→パス返却）。`cleanup(role: AgentRole, taskId: string)` でブランチ削除。`child_process.execSync` で `git worktree add/remove`, `git branch -D` を実行する。T037a が GREEN になることを確認 → `src/agents/worktree-manager.ts`
 
-- [ ] T038 [US1] **GREEN 実装**: `src/agents/dispatcher.ts` を作成する。`Dispatcher` クラスを export する。`dispatch(task: Task, config: AgentConfig): Promise<DispatchResult>` メソッドで Agent SDK `query()` を呼び出す。`AbortController` + `setTimeout` でタイムアウト、`finally` で `clearTimeout`。ResultMessage の subtype で分岐し、success 時は `structured_output` を Zod バリデーション。パイプライン review 完了時は `awaiting_approval` に遷移。T027 が GREEN になることを確認 → `src/agents/dispatcher.ts`
+- [x] T038 [US1] **GREEN 実装**: `src/agents/dispatcher.ts` を作成する。`Dispatcher` クラスを export する。`dispatch(task: Task, config: AgentConfig): Promise<DispatchResult>` メソッドで Agent SDK `query()` を呼び出す。`AbortController` + `setTimeout` でタイムアウト、`finally` で `clearTimeout`。ResultMessage の subtype で分岐し、success 時は `structured_output` を Zod バリデーション。パイプライン review 完了時は `awaiting_approval` に遷移。T027 が GREEN になることを確認 → `src/agents/dispatcher.ts`
 
-- [ ] T039 [US1] **GREEN 実装**: `src/sources/cron-scheduler.ts` を作成する。`CronScheduler` クラスを export する。`checkAndCreateTasks(now: Date, queue: TaskQueue)` で時刻に応じたタスク生成と冪等チェック。T029 が GREEN になることを確認 → `src/sources/cron-scheduler.ts`
+- [x] T039 [US1] **GREEN 実装**: `src/sources/cron-scheduler.ts` を作成する。`CronScheduler` クラスを export する。`checkAndCreateTasks(now: Date, queue: TaskQueue)` で時刻に応じたタスク生成と冪等チェック。T029 が GREEN になることを確認 → `src/sources/cron-scheduler.ts`
 
-- [ ] T040 [US1] **GREEN 実装**: `src/sources/manual-cli.ts` を作成する。`process.argv` をパースし、`--type`, `--title`, `--description`, `--priority`, `--depends-on` を受け取り、`TaskQueue.push()` でキューに投入する。T030 が GREEN になることを確認 → `src/sources/manual-cli.ts`
+- [x] T040 [US1] **GREEN 実装**: `src/sources/manual-cli.ts` を作成する。`process.argv` をパースし、`--type`, `--title`, `--description`, `--priority`, `--depends-on` を受け取り、`TaskQueue.push()` でキューに投入する。T030 が GREEN になることを確認 → `src/sources/manual-cli.ts`
 
 - [ ] T040a [US1] `package.json` の `scripts` に `"task:add": "node dist/src/sources/manual-cli.js"` を追加する。`npm run task:add -- --type review --title "test" --description "test"` で実行できることを確認する → `package.json`
 
-- [ ] T041 [US1] **GREEN 実装**: `src/orchestrator.ts` を作成する。`Orchestrator` クラスを export する。`start()` でメインループを開始し、(1) `CronScheduler.checkAndCreateTasks()`, (2) `TaskQueue.getNext()`, (3) 安全チェック（CircuitBreaker, RateController, BudgetGuard）, (4) **Semaphore で同時実行数を `MAX_CONCURRENT` に制限**（`Promise` ベースの簡易 Semaphore を実装）, (5) `Dispatcher.dispatch()`, (6) 結果に応じたステータス更新。`stop()` で graceful shutdown（実行中タスクの完了を待機）。起動時に `TaskQueue.recoverFromCrash()` を呼ぶ → `src/orchestrator.ts`
+- [x] T041 [US1] **GREEN 実装**: `src/orchestrator.ts` を作成する。`Orchestrator` クラスを export する。`start()` でメインループを開始し、(1) `CronScheduler.checkAndCreateTasks()`, (2) `TaskQueue.getNext()`, (3) 安全チェック（CircuitBreaker, RateController, BudgetGuard）, (4) **Semaphore で同時実行数を `MAX_CONCURRENT` に制限**（`Promise` ベースの簡易 Semaphore を実装）, (5) `Dispatcher.dispatch()`, (6) 結果に応じたステータス更新。`stop()` で graceful shutdown（実行中タスクの完了を待機）。起動時に `TaskQueue.recoverFromCrash()` を呼ぶ → `src/orchestrator.ts`
 
-- [ ] T042 [US1] **GREEN 実装**: `src/index.ts` を作成する。`loadConfig()` → DB 初期化 → `Orchestrator` 生成 → `orchestrator.start()`。`SIGTERM`/`SIGINT` で `orchestrator.stop()` → `src/index.ts`
+- [x] T042 [US1] **GREEN 実装**: `src/index.ts` を作成する。`loadConfig()` → DB 初期化 → `Orchestrator` 生成 → `orchestrator.start()`。`SIGTERM`/`SIGINT` で `orchestrator.stop()` → `src/index.ts`
 
 ### 統合テスト
 
-- [ ] T043 [US1] **統合テスト**: `tests/integration/orchestrator.test.ts` を作成し、test-cases.md の T-ORC-001〜T-ORC-002, T-ORC-007〜T-ORC-010 を記述する。Agent SDK と Slack をモックし、(1) 空キューで 1 サイクル、(2) review タスク投入→Reviewer 実行→completed、(3) 起動時クラッシュ復旧、(4) Semaphore 同時実行制限、(5) SIGTERM graceful shutdown。**モックされた Orchestrator の 1 サイクルが正常動作すること**を確認 → `tests/integration/orchestrator.test.ts`
+- [x] T043 [US1] **統合テスト**: `tests/integration/orchestrator.test.ts` を作成し、test-cases.md の T-ORC-001〜T-ORC-002, T-ORC-007〜T-ORC-010 を記述する。Agent SDK と Slack をモックし、(1) 空キューで 1 サイクル、(2) review タスク投入→Reviewer 実行→completed、(3) 起動時クラッシュ復旧、(4) Semaphore 同時実行制限、(5) SIGTERM graceful shutdown。**モックされた Orchestrator の 1 サイクルが正常動作すること**を確認 → `tests/integration/orchestrator.test.ts`
 
 - [ ] T044 [US1] `tests/unit/index.test.ts` を作成し、test-cases.md の T-IDX-001〜T-IDX-005 の 5 テストケースを記述・実装する → `tests/unit/index.test.ts`
 
