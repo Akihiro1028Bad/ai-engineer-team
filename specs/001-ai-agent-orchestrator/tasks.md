@@ -30,7 +30,7 @@
 
 - [ ] T004 [P] Vitest 設定ファイルを作成する。`globals: true`, `environment: "node"`, TypeScript パスエイリアスの設定、カバレッジレポーター（`text`, `lcov`）を設定し、`coverage.thresholds` で `statements: 100, branches: 100, functions: 100, lines: 100` を設定する → `vitest.config.ts`
 
-- [ ] T005 [P] `.env.example` を作成する。全環境変数をコメント付きで記載する（`RATE_CONTROL_ENABLED`, `RATE_COOLDOWN_SECONDS`, `GITHUB_TOKEN`, `GITHUB_REPO`, `PROJECT_DIR`, `WORKTREE_DIR`, `SLACK_WEBHOOK_URL`, `DAILY_BUDGET_USD`, `MAX_CONCURRENT`）。**実際の値は含めないこと** → `.env.example`
+- [ ] T005 [P] `.env.example` を作成する。全環境変数をコメント付きで記載する（`RATE_CONTROL_ENABLED`, `RATE_COOLDOWN_SECONDS`, `MAX_TASKS_PER_WINDOW`, `RATE_LIMIT_WARN_THRESHOLD`, `GITHUB_TOKEN`, `GITHUB_REPO`, `PROJECT_DIR`, `WORKTREE_DIR`, `SLACK_WEBHOOK_URL`, `DAILY_BUDGET_USD`, `MAX_CONCURRENT`）。**実際の値は含めないこと** → `.env.example`
 
 - [ ] T006 [P] `.gitignore` に `node_modules/`, `dist/`, `.env`, `tasks.db`, `logs/`, `coverage/` を追加する → `.gitignore`
 
@@ -60,7 +60,7 @@
 
 > **TDD サイクル**: テスト T011 → 実装 T012
 
-- [ ] T011 **RED テスト作成**: `tests/unit/config/env-config.test.ts` を作成し、test-cases.md の T-ENV-001〜T-ENV-014 の全 14 テストケースを記述する。具体的には: (1) Max プラン用の全必須変数セットで成功、(2) API 課金用の全必須変数セットで成功、(3) `GITHUB_TOKEN`, `PROJECT_DIR`, `WORKTREE_DIR`, `GITHUB_REPO` を個別に欠落させてエラー、(4) `ANTHROPIC_API_KEY` と `RATE_CONTROL_ENABLED=true` の同時設定でエラー、(5) `DAILY_BUDGET_USD=-5` でエラー、(6) `MAX_CONCURRENT=0` でエラー、(7) `MAX_CONCURRENT` 未設定でデフォルト `1`、(8) `SLACK_WEBHOOK_URL` 未設定で成功、(9) `SLACK_WEBHOOK_URL="not-a-url"` でエラー、(10) `GITHUB_REPO="invalid"` でエラー。テスト内では `process.env` をモックする。`npm run test` で **RED** を確認 → `tests/unit/config/env-config.test.ts`
+- [ ] T011 **RED テスト作成**: `tests/unit/config/env-config.test.ts` を作成し、test-cases.md の T-ENV-001〜T-ENV-014 の全 14 テストケース + 追加 2 ケースを記述する。具体的には: (1) Max プラン用の全必須変数セットで成功、(2) API 課金用の全必須変数セットで成功、(3) `GITHUB_TOKEN`, `PROJECT_DIR`, `WORKTREE_DIR`, `GITHUB_REPO` を個別に欠落させてエラー、(4) `ANTHROPIC_API_KEY` と `RATE_CONTROL_ENABLED=true` の同時設定でエラー、(5) `DAILY_BUDGET_USD=-5` でエラー、(6) `MAX_CONCURRENT=0` でエラー、(7) `MAX_CONCURRENT` 未設定でデフォルト `1`、(8) `SLACK_WEBHOOK_URL` 未設定で成功、(9) `SLACK_WEBHOOK_URL="not-a-url"` でエラー、(10) `GITHUB_REPO="invalid"` でエラー、**(11) `MAX_TASKS_PER_WINDOW` 未設定でデフォルト `150`、(12) `RATE_LIMIT_WARN_THRESHOLD` 未設定でデフォルト `0.1`（10%）**。テスト内では `process.env` をモックする。`npm run test` で **RED** を確認 → `tests/unit/config/env-config.test.ts`
 
 - [ ] T012 **GREEN 実装**: `src/config/env-config.ts` を作成する。Zod スキーマ `EnvConfig` を定義し、`loadConfig()` 関数で `process.env` をバリデーションする。`ANTHROPIC_API_KEY` と `RATE_CONTROL_ENABLED=true` の相互排他チェックを `refine()` で実装する。`GITHUB_REPO` の `owner/repo` 形式を `regex` でバリデーションする。`npm run test` で **GREEN** を確認 → `src/config/env-config.ts`
 
@@ -156,13 +156,19 @@
 
 - [ ] T037 [US1] **GREEN 実装**: `src/safety/budget-guard.ts` を作成する。`BudgetGuard` クラスを export する。`canExecute(): boolean` と `recordCost(usd: number)` を提供する。T033 が GREEN になることを確認 → `src/safety/budget-guard.ts`
 
+- [ ] T037a [P] [US1] **RED テスト**: `tests/unit/agents/worktree-manager.test.ts` を作成する。(1) worktree が存在しない場合に `git worktree add` で作成される、(2) タスク用ブランチ `agent/{role}/{taskId}` が作成される、(3) 既存の worktree がある場合は再利用（新ブランチのみ作成）、(4) 前回タスクの残骸ブランチが存在する場合はクリーンアップ後に新ブランチ作成、(5) タスク完了後に worktree 内の未コミット変更がない場合はブランチ削除。`child_process.execSync` をモックする → `tests/unit/agents/worktree-manager.test.ts`
+
+- [ ] T037b [US1] **GREEN 実装**: `src/agents/worktree-manager.ts` を作成する。`WorktreeManager` クラスを export する。`prepare(role: AgentRole, taskId: string): string` で worktree パスを返す（存在確認→ブランチ作成→パス返却）。`cleanup(role: AgentRole, taskId: string)` でブランチ削除。`child_process.execSync` で `git worktree add/remove`, `git branch -D` を実行する。T037a が GREEN になることを確認 → `src/agents/worktree-manager.ts`
+
 - [ ] T038 [US1] **GREEN 実装**: `src/agents/dispatcher.ts` を作成する。`Dispatcher` クラスを export する。`dispatch(task: Task, config: AgentConfig): Promise<DispatchResult>` メソッドで Agent SDK `query()` を呼び出す。`AbortController` + `setTimeout` でタイムアウト、`finally` で `clearTimeout`。ResultMessage の subtype で分岐し、success 時は `structured_output` を Zod バリデーション。パイプライン review 完了時は `awaiting_approval` に遷移。T027 が GREEN になることを確認 → `src/agents/dispatcher.ts`
 
 - [ ] T039 [US1] **GREEN 実装**: `src/sources/cron-scheduler.ts` を作成する。`CronScheduler` クラスを export する。`checkAndCreateTasks(now: Date, queue: TaskQueue)` で時刻に応じたタスク生成と冪等チェック。T029 が GREEN になることを確認 → `src/sources/cron-scheduler.ts`
 
 - [ ] T040 [US1] **GREEN 実装**: `src/sources/manual-cli.ts` を作成する。`process.argv` をパースし、`--type`, `--title`, `--description`, `--priority`, `--depends-on` を受け取り、`TaskQueue.push()` でキューに投入する。T030 が GREEN になることを確認 → `src/sources/manual-cli.ts`
 
-- [ ] T041 [US1] **GREEN 実装**: `src/orchestrator.ts` を作成する。`Orchestrator` クラスを export する。`start()` でメインループを開始し、(1) `CronScheduler.checkAndCreateTasks()`, (2) `TaskQueue.getNext()`, (3) 安全チェック（CircuitBreaker, RateController, BudgetGuard）, (4) `Dispatcher.dispatch()`, (5) 結果に応じたステータス更新。`stop()` で graceful shutdown。起動時に `TaskQueue.recoverFromCrash()` を呼ぶ → `src/orchestrator.ts`
+- [ ] T040a [US1] `package.json` の `scripts` に `"task:add": "node dist/src/sources/manual-cli.js"` を追加する。`npm run task:add -- --type review --title "test" --description "test"` で実行できることを確認する → `package.json`
+
+- [ ] T041 [US1] **GREEN 実装**: `src/orchestrator.ts` を作成する。`Orchestrator` クラスを export する。`start()` でメインループを開始し、(1) `CronScheduler.checkAndCreateTasks()`, (2) `TaskQueue.getNext()`, (3) 安全チェック（CircuitBreaker, RateController, BudgetGuard）, (4) **Semaphore で同時実行数を `MAX_CONCURRENT` に制限**（`Promise` ベースの簡易 Semaphore を実装）, (5) `Dispatcher.dispatch()`, (6) 結果に応じたステータス更新。`stop()` で graceful shutdown（実行中タスクの完了を待機）。起動時に `TaskQueue.recoverFromCrash()` を呼ぶ → `src/orchestrator.ts`
 
 - [ ] T042 [US1] **GREEN 実装**: `src/index.ts` を作成する。`loadConfig()` → DB 初期化 → `Orchestrator` 生成 → `orchestrator.start()`。`SIGTERM`/`SIGINT` で `orchestrator.stop()` → `src/index.ts`
 
@@ -184,7 +190,7 @@
 
 ### テスト作成（RED）
 
-- [ ] T045 [P] [US2] **RED テスト**: `tests/unit/agents/classifier.test.ts` を作成し、test-cases.md の T-CLS-001〜T-CLS-010 の全 10 テストケースを記述する。Agent SDK `query()` をモックする。(1) bug ラベル→fix(single)、(2) feature→pipeline、(3) docs→document、(4) ラベルなし→Haiku 判定、(5) 空 body→unclear、(6) 短 body→unclear、(7) API エラー→unclear、(8) 不正 JSON→unclear、(9) pipeline の依存関係、(10) model="haiku" → `tests/unit/agents/classifier.test.ts`
+- [ ] T045 [P] [US2] **RED テスト**: `tests/unit/agents/classifier.test.ts` を作成し、test-cases.md の T-CLS-001〜T-CLS-010 の全 10 テストケース + 追加 1 ケースを記述する。Agent SDK `query()` と `octokit.issues.createComment()` をモックする。(1) bug ラベル→fix(single)、(2) feature→pipeline、(3) docs→document、(4) ラベルなし→Haiku で本文分析、(5) 空 body→unclear、(6) 短 body→unclear、(7) API エラー→unclear、(8) 不正 JSON→unclear、(9) pipeline の依存関係、(10) model="haiku"、**(11) unclear 判定時に `octokit.issues.createComment()` が質問テキスト付きで呼ばれる** → `tests/unit/agents/classifier.test.ts`
 
 - [ ] T046 [P] [US2] **RED テスト**: `tests/unit/sources/github-poller.test.ts` を作成し、test-cases.md の T-GHP-001〜T-GHP-013 の全 13 テストケースを記述する。`@octokit/rest` をモックする。**Issue ポーリング**: (1) ai-task Issue 検出、(2) ラベルなし無視、(3) 処理済み重複無視、(4) 複数一括、(5) 5xx エラー、(6) 403 レート制限、(7) ネットワークエラー。**PR approve 監視**: (8) approved→後続 pending、(9) changes_requested→変更なし、(10) closed→failed、(11) awaiting_approval なし→スキップ、(12) 複数待機→個別確認、(13) PR API エラー → `tests/unit/sources/github-poller.test.ts`
 
@@ -194,13 +200,13 @@
 
 ### 実装（GREEN）
 
-- [ ] T049 [US2] **GREEN 実装**: `src/agents/classifier.ts` を作成する。`Classifier` クラスを export する。`classify(issue: { title, body, labels })` メソッドで (1) ラベルベース判定、(2) Haiku サブエージェントによる本文分析、(3) Zod バリデーション。Agent SDK `query()` に `model: "haiku"`, `maxTurns: 1` を設定。T045 が GREEN になることを確認 → `src/agents/classifier.ts`
+- [ ] T049 [US2] **GREEN 実装**: `src/agents/classifier.ts` を作成する。`Classifier` クラスを export する。`classify(issue: { title, body, labels })` メソッドで (1) ラベルベース判定（bug→fix, feature→pipeline, docs→document）、(2) **ラベルで判定できない場合は Haiku サブエージェントに Issue のタイトルと本文を渡し、タスク種別と複雑度を判定させる**（FR-002 対応）、(3) Zod バリデーション、(4) **unclear 判定時は GitHub Issue にコメントで質問を自動投稿する**（FR-004 対応: `octokit.issues.createComment()` を呼び出す）。Agent SDK `query()` に `model: "haiku"`, `maxTurns: 1` を設定。T045 が GREEN になることを確認 → `src/agents/classifier.ts`
 
 - [ ] T050 [US2] **GREEN 実装**: `src/sources/github-poller.ts` を作成する。`GitHubPoller` クラスを export する。`pollIssues()` で `ai-task` ラベル Issue を取得し、`isDuplicate()` チェック後に Classifier → キュー投入。`pollApprovals()` で `awaiting_approval` タスクの PR レビューステータスを確認し、approve/reject/close に応じて状態遷移。API エラーはログのみで例外を投げない。T046 が GREEN になることを確認 → `src/sources/github-poller.ts`
 
 - [ ] T051 [US2] **GREEN 実装**: `src/bridges/result-collector.ts` を作成する。`ResultCollector` クラスを export する。`createDesignPR(task, handoff)` で設計 PR 作成→Slack approval_requested、`createFinalPR(tasks)` で最終 PR→Slack pipeline_pr_created、`createSinglePR(task)` で単体 PR→task_completed。diff サイズチェック（500 行上限）。PR body にエビデンス（テスト結果ログ）を含める。T047 が GREEN になることを確認 → `src/bridges/result-collector.ts`
 
-- [ ] T052 [US2] **GREEN 実装**: T048 の contract テストに対応する Zod スキーマ（Reviewer/Fixer/Builder/Scribe の各 Handoff data スキーマ）を `src/types.ts` に追加する。T048 が GREEN になることを確認
+- [ ] T052 [US2] **GREEN 実装**: T048 の contract テストに対応する Zod スキーマ（Reviewer/Fixer/Builder/Scribe の各 Handoff data スキーマ）を `src/types.ts` に追加する。T048 が GREEN になることを確認 → `src/types.ts`
 
 ### 統合テスト
 
@@ -208,7 +214,7 @@
 
 - [ ] T054 [US2] **統合テスト**: `tests/integration/dispatcher.test.ts` を作成する。Agent SDK モック + DB でパイプライン全フロー（Reviewer→awaiting_approval→approve→Fixer→completed）を検証。test-cases.md の T-ORC-003 に対応 → `tests/integration/dispatcher.test.ts`
 
-- [ ] T055 [US2] `src/orchestrator.ts` を更新し、メインループに `GitHubPoller.pollIssues()` と `GitHubPoller.pollApprovals()` を統合する。ポーリング間隔 5 分で実行する。既存の US1 テストが引き続き GREEN であることを確認する
+- [ ] T055 [US2] **GREEN 実装**: `src/orchestrator.ts` を更新し、メインループに `GitHubPoller.pollIssues()` と `GitHubPoller.pollApprovals()` を統合する。ポーリング間隔 5 分で実行する。既存の US1 テストが引き続き GREEN であることを確認する
 
 **Checkpoint**: US2 完了。GitHub Issue → 分類 → パイプライン → 設計PR → 承認→ Fixer → 最終PR。全テスト GREEN。
 
@@ -246,9 +252,9 @@
 
 - [ ] T062 [P] [US4] **RED テスト → GREEN 実装**: `src/orchestrator.ts` の安全機構統合テストを追加する。(1) Circuit Breaker OPEN 中はタスクを取り出さない（T-ORC-004）、(2) Rate Controller クールダウン中は sleep 後に実行（T-ORC-005）、(3) Budget Guard 停止中はタスクを取り出さない（T-ORC-006）。各安全機構の `canExecute()` をモック/スパイし、Orchestrator のメインループが正しく制御されることを検証
 
-- [ ] T063 [US4] `ai-engineer.service` systemd ユニットファイルを作成する。plan.md の設計書セクション 12.5 に従い、`Type=simple`, `Restart=always`, `RestartSec=30` を設定する → `ai-engineer.service`
+- [ ] T063 [US4] `ai-engineer.service` systemd ユニットファイルを作成する。以下の設定を記述する: `[Unit] Description=AI Engineering Team Orchestrator, After=network.target`, `[Service] Type=simple, WorkingDirectory=/home/user/ai-engineer, EnvironmentFile=/home/user/ai-engineer/.env, ExecStart=/usr/bin/node /home/user/ai-engineer/dist/src/index.js, Restart=always, RestartSec=30`, `[Install] WantedBy=default.target`。設計書 `AI_Engineering_Team_設計書_v2.1.md` セクション 12.5 を参照 → `ai-engineer.service`
 
-- [ ] T064 [US4] `src/orchestrator.ts` の `start()` にログローテーション呼び出しを追加する。起動時に `rotateOldLogs()` を実行する
+- [ ] T064 [US4] `src/orchestrator.ts` の `start()` にログローテーション呼び出しを追加する。**起動時**に `rotateOldLogs()` を実行し、さらに**毎日 00:00 に定期実行**するスケジュールをメインループに追加する（FR-027 の 30 日保持 + 自動削除を長時間稼働中も保証する）
 
 **Checkpoint**: US4 完了。安全機構が Orchestrator に統合され、systemd で常駐化可能。全テスト GREEN。
 
