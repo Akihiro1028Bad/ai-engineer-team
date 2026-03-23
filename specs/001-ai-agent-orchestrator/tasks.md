@@ -190,31 +190,31 @@
 
 ### テスト作成（RED）
 
-- [ ] T045 [P] [US2] **RED テスト**: `tests/unit/agents/classifier.test.ts` を作成し、test-cases.md の T-CLS-001〜T-CLS-010 の全 10 テストケース + 追加 1 ケースを記述する。Agent SDK `query()` と `octokit.issues.createComment()` をモックする。(1) bug ラベル→fix(single)、(2) feature→pipeline、(3) docs→document、(4) ラベルなし→Haiku で本文分析、(5) 空 body→unclear、(6) 短 body→unclear、(7) API エラー→unclear、(8) 不正 JSON→unclear、(9) pipeline の依存関係、(10) model="haiku"、**(11) unclear 判定時に `octokit.issues.createComment()` が質問テキスト付きで呼ばれる** → `tests/unit/agents/classifier.test.ts`
+- [x] T045 [P] [US2] **RED テスト**: `tests/unit/agents/classifier.test.ts` を作成し、test-cases.md の T-CLS-001〜T-CLS-010 の全 10 テストケース + 追加 1 ケースを記述する。Agent SDK `query()` と `octokit.issues.createComment()` をモックする。(1) bug ラベル→fix(single)、(2) feature→pipeline、(3) docs→document、(4) ラベルなし→Haiku で本文分析、(5) 空 body→unclear、(6) 短 body→unclear、(7) API エラー→unclear、(8) 不正 JSON→unclear、(9) pipeline の依存関係、(10) model="haiku"、**(11) unclear 判定時に `octokit.issues.createComment()` が質問テキスト付きで呼ばれる** → `tests/unit/agents/classifier.test.ts`
 
-- [ ] T046 [P] [US2] **RED テスト**: `tests/unit/sources/github-poller.test.ts` を作成し、test-cases.md の T-GHP-001〜T-GHP-013 の全 13 テストケースを記述する。`@octokit/rest` をモックする。**Issue ポーリング**: (1) ai-task Issue 検出、(2) ラベルなし無視、(3) 処理済み重複無視、(4) 複数一括、(5) 5xx エラー、(6) 403 レート制限、(7) ネットワークエラー。**PR approve 監視**: (8) approved→後続 pending、(9) changes_requested→変更なし、(10) closed→failed、(11) awaiting_approval なし→スキップ、(12) 複数待機→個別確認、(13) PR API エラー → `tests/unit/sources/github-poller.test.ts`
+- [x] T046 [P] [US2] **RED テスト**: `tests/unit/sources/github-poller.test.ts` を作成し、test-cases.md の T-GHP-001〜T-GHP-013 の全 13 テストケースを記述する。`@octokit/rest` をモックする。**Issue ポーリング**: (1) ai-task Issue 検出、(2) ラベルなし無視、(3) 処理済み重複無視、(4) 複数一括、(5) 5xx エラー、(6) 403 レート制限、(7) ネットワークエラー。**PR approve 監視**: (8) approved→後続 pending、(9) changes_requested→変更なし、(10) closed→failed、(11) awaiting_approval なし→スキップ、(12) 複数待機→個別確認、(13) PR API エラー → `tests/unit/sources/github-poller.test.ts`
 
-- [ ] T047 [P] [US2] **RED テスト**: `tests/unit/bridges/result-collector.test.ts` を作成し、test-cases.md の T-RC-001〜T-RC-008 の 8 テストケースを記述する。Octokit と SlackNotifier をモック。(1) 設計 PR 作成→approval_requested 通知、(2) 最終 PR→pipeline_pr_created、(3) 単体 PR→task_completed、(4) diff 500 行以下→成功、(5) 600 行→拒否、(6) PR API エラー、(7) エビデンス含有、(8) Slack 未設定→スキップ → `tests/unit/bridges/result-collector.test.ts`
+- [x] T047 [P] [US2] **RED テスト**: `tests/unit/bridges/result-collector.test.ts` を作成し、test-cases.md の T-RC-001〜T-RC-008 の 8 テストケースを記述する。Octokit と SlackNotifier をモック。(1) 設計 PR 作成→approval_requested 通知、(2) 最終 PR→pipeline_pr_created、(3) 単体 PR→task_completed、(4) diff 500 行以下→成功、(5) 600 行→拒否、(6) PR API エラー、(7) エビデンス含有、(8) Slack 未設定→スキップ → `tests/unit/bridges/result-collector.test.ts`
 
-- [ ] T048 [P] [US2] **RED テスト**: `tests/contract/handoff-schema.test.ts` を作成し、test-cases.md の T-CTR-001〜T-CTR-007 の全 7 テストケースを記述する。(1) Reviewer handoff スキーマ、(2) Fixer、(3) Builder、(4) Scribe、(5) Slack 全 12 イベント、(6) Classification single、(7) Classification pipeline → `tests/contract/handoff-schema.test.ts`
+- [x] T048 [P] [US2] **RED テスト**: `tests/contract/handoff-schema.test.ts` を作成し、test-cases.md の T-CTR-001〜T-CTR-007 の全 7 テストケースを記述する。(1) Reviewer handoff スキーマ、(2) Fixer、(3) Builder、(4) Scribe、(5) Slack 全 12 イベント、(6) Classification single、(7) Classification pipeline → `tests/contract/handoff-schema.test.ts`
 
 ### 実装（GREEN）
 
-- [ ] T049 [US2] **GREEN 実装**: `src/agents/classifier.ts` を作成する。`Classifier` クラスを export する。`classify(issue: { title, body, labels })` メソッドで (1) ラベルベース判定（bug→fix, feature→pipeline, docs→document）、(2) **ラベルで判定できない場合は Haiku サブエージェントに Issue のタイトルと本文を渡し、タスク種別と複雑度を判定させる**（FR-002 対応）、(3) Zod バリデーション、(4) **unclear 判定時は GitHub Issue にコメントで質問を自動投稿する**（FR-004 対応: `octokit.issues.createComment()` を呼び出す）。Agent SDK `query()` に `model: "haiku"`, `maxTurns: 1` を設定。T045 が GREEN になることを確認 → `src/agents/classifier.ts`
+- [x] T049 [US2] **GREEN 実装**: `src/agents/classifier.ts` を作成する。`Classifier` クラスを export する。`classify(issue: { title, body, labels })` メソッドで (1) ラベルベース判定（bug→fix, feature→pipeline, docs→document）、(2) **ラベルで判定できない場合は Haiku サブエージェントに Issue のタイトルと本文を渡し、タスク種別と複雑度を判定させる**（FR-002 対応）、(3) Zod バリデーション、(4) **unclear 判定時は GitHub Issue にコメントで質問を自動投稿する**（FR-004 対応: `octokit.issues.createComment()` を呼び出す）。Agent SDK `query()` に `model: "haiku"`, `maxTurns: 1` を設定。T045 が GREEN になることを確認 → `src/agents/classifier.ts`
 
-- [ ] T050 [US2] **GREEN 実装**: `src/sources/github-poller.ts` を作成する。`GitHubPoller` クラスを export する。`pollIssues()` で `ai-task` ラベル Issue を取得し、`isDuplicate()` チェック後に Classifier → キュー投入。`pollApprovals()` で `awaiting_approval` タスクの PR レビューステータスを確認し、approve/reject/close に応じて状態遷移。API エラーはログのみで例外を投げない。T046 が GREEN になることを確認 → `src/sources/github-poller.ts`
+- [x] T050 [US2] **GREEN 実装**: `src/sources/github-poller.ts` を作成する。`GitHubPoller` クラスを export する。`pollIssues()` で `ai-task` ラベル Issue を取得し、`isDuplicate()` チェック後に Classifier → キュー投入。`pollApprovals()` で `awaiting_approval` タスクの PR レビューステータスを確認し、approve/reject/close に応じて状態遷移。API エラーはログのみで例外を投げない。T046 が GREEN になることを確認 → `src/sources/github-poller.ts`
 
-- [ ] T051 [US2] **GREEN 実装**: `src/bridges/result-collector.ts` を作成する。`ResultCollector` クラスを export する。`createDesignPR(task, handoff)` で設計 PR 作成→Slack approval_requested、`createFinalPR(tasks)` で最終 PR→Slack pipeline_pr_created、`createSinglePR(task)` で単体 PR→task_completed。diff サイズチェック（500 行上限）。PR body にエビデンス（テスト結果ログ）を含める。T047 が GREEN になることを確認 → `src/bridges/result-collector.ts`
+- [x] T051 [US2] **GREEN 実装**: `src/bridges/result-collector.ts` を作成する。`ResultCollector` クラスを export する。`createDesignPR(task, handoff)` で設計 PR 作成→Slack approval_requested、`createFinalPR(tasks)` で最終 PR→Slack pipeline_pr_created、`createSinglePR(task)` で単体 PR→task_completed。diff サイズチェック（500 行上限）。PR body にエビデンス（テスト結果ログ）を含める。T047 が GREEN になることを確認 → `src/bridges/result-collector.ts`
 
-- [ ] T052 [US2] **GREEN 実装**: T048 の contract テストに対応する Zod スキーマ（Reviewer/Fixer/Builder/Scribe の各 Handoff data スキーマ）を `src/types.ts` に追加する。T048 が GREEN になることを確認 → `src/types.ts`
+- [x] T052 [US2] **GREEN 実装**: T048 の contract テストに対応する Zod スキーマ（Reviewer/Fixer/Builder/Scribe の各 Handoff data スキーマ）を `src/types.ts` に追加する。T048 が GREEN になることを確認 → `src/types.ts`
 
 ### 統合テスト
 
-- [ ] T053 [US2] **統合テスト**: `tests/integration/github-poller.test.ts` を作成する。Octokit と Agent SDK をモックし、(1) Issue 検出→分類→キュー投入→エージェント実行のエンドツーエンド、(2) PR approve→後続タスク起動のフロー。test-cases.md の T-ORC-003, T-ORC-011 に対応 → `tests/integration/github-poller.test.ts`
+- [x] T053 [US2] **統合テスト**: `tests/integration/github-poller.test.ts` を作成する。Octokit と Agent SDK をモックし、(1) Issue 検出→分類→キュー投入→エージェント実行のエンドツーエンド、(2) PR approve→後続タスク起動のフロー。test-cases.md の T-ORC-003, T-ORC-011 に対応 → `tests/integration/github-poller.test.ts`
 
-- [ ] T054 [US2] **統合テスト**: `tests/integration/dispatcher.test.ts` を作成する。Agent SDK モック + DB でパイプライン全フロー（Reviewer→awaiting_approval→approve→Fixer→completed）を検証。test-cases.md の T-ORC-003 に対応 → `tests/integration/dispatcher.test.ts`
+- [x] T054 [US2] **統合テスト**: `tests/integration/dispatcher.test.ts` を作成する。Agent SDK モック + DB でパイプライン全フロー（Reviewer→awaiting_approval→approve→Fixer→completed）を検証。test-cases.md の T-ORC-003 に対応 → `tests/integration/dispatcher.test.ts`
 
-- [ ] T055 [US2] **GREEN 実装**: `src/orchestrator.ts` を更新し、メインループに `GitHubPoller.pollIssues()` と `GitHubPoller.pollApprovals()` を統合する。ポーリング間隔 5 分で実行する。既存の US1 テストが引き続き GREEN であることを確認する
+- [x] T055 [US2] **GREEN 実装**: `src/orchestrator.ts` を更新し、メインループに `GitHubPoller.pollIssues()` と `GitHubPoller.pollApprovals()` を統合する。ポーリング間隔 5 分で実行する。既存の US1 テストが引き続き GREEN であることを確認する
 
 **Checkpoint**: US2 完了。GitHub Issue → 分類 → パイプライン → 設計PR → 承認→ Fixer → 最終PR。全テスト GREEN。
 

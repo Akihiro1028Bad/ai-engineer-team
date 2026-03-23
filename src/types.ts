@@ -98,6 +98,45 @@ export const SlackNotificationSchema = z.object({
 });
 export type SlackNotification = z.infer<typeof SlackNotificationSchema>;
 
+// === Agent-specific Handoff Data Schemas ===
+
+const TestResultSchema = z.object({
+  passed: z.number().int(),
+  failed: z.number().int(),
+  skipped: z.number().int(),
+});
+
+export const ReviewerHandoffDataSchema = z.object({
+  findings: z.array(
+    z.object({
+      severity: z.string(),
+      file: z.string(),
+      line: z.number().int().optional(),
+      issue: z.string(),
+      suggestion: z.string().optional(),
+    }),
+  ),
+  summary: z.string(),
+});
+
+export const FixerHandoffDataSchema = z.object({
+  fixedFiles: z.array(z.string()),
+  testResult: TestResultSchema,
+  summary: z.string(),
+});
+
+export const BuilderHandoffDataSchema = z.object({
+  newFiles: z.array(z.string()),
+  modifiedFiles: z.array(z.string()),
+  testResult: TestResultSchema,
+  summary: z.string(),
+});
+
+export const ScribeHandoffDataSchema = z.object({
+  updatedDocs: z.array(z.string()),
+  summary: z.string(),
+});
+
 // === AgentConfig ===
 
 export interface AgentConfig {

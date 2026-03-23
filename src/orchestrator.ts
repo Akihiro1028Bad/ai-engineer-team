@@ -3,6 +3,7 @@ import type { Dispatcher } from "./agents/dispatcher.js";
 import { getAgentConfig } from "./agents/agent-config.js";
 import { taskTypeToRole } from "./agents/role-mapping.js";
 import type { CronScheduler } from "./sources/cron-scheduler.js";
+import type { GitHubPoller } from "./sources/github-poller.js";
 import type { CircuitBreaker } from "./safety/circuit-breaker.js";
 import type { RateController } from "./safety/rate-controller.js";
 import type { BudgetGuard } from "./safety/budget-guard.js";
@@ -14,6 +15,7 @@ export interface OrchestratorDeps {
   queue: TaskQueue;
   dispatcher: Dispatcher;
   cronScheduler: CronScheduler;
+  githubPoller?: GitHubPoller;
   circuitBreaker: CircuitBreaker;
   rateController: RateController;
   budgetGuard: BudgetGuard;
@@ -61,6 +63,12 @@ export class Orchestrator {
 
     // Cron check
     cronScheduler.checkAndCreateTasks(new Date());
+
+    // GitHub polling
+    if (this.deps.githubPoller) {
+      await this.deps.githubPoller.pollIssues();
+      await this.deps.githubPoller.pollApprovals();
+    }
 
     // Budget daily reset
     budgetGuard.checkDailyReset();
