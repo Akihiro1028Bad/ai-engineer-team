@@ -50,7 +50,7 @@ export class Dispatcher {
     let branch: string;
     if (existingBranch) {
       // Reviewer の worktree 上で既存ブランチに切り替え
-      cwd = this.worktreeManager.prepareExistingBranch("reviewer", existingBranch);
+      cwd = this.worktreeManager.prepareExistingBranch(role, existingBranch);
       branch = existingBranch;
     } else {
       cwd = this.worktreeManager.prepare(role, task.id);
@@ -62,8 +62,18 @@ export class Dispatcher {
     const issueNumber = extractIssueNumber(task.id);
 
     if (task.taskType !== "review" && issueNumber) {
-      const designPath = join(cwd, `specs/issue-${issueNumber}/design.md`);
-      if (existsSync(designPath)) {
+      // 設計書パスを探索（単一スコープ or 複数スコープ）
+      const candidates = [
+        join(cwd, `specs/issue-${issueNumber}/design.md`),
+      ];
+      // task description からスコープパスを抽出
+      const scopeMatch = /specs\/issue-\d+\/([^/]+)\/design\.md/.exec(task.description);
+      if (scopeMatch) {
+        candidates.unshift(join(cwd, `specs/issue-${issueNumber}/${scopeMatch[1]}/design.md`));
+      }
+
+      for (const designPath of candidates) {
+        if (!existsSync(designPath)) continue;
         const designContent = readFileSync(designPath, "utf-8");
         prompt = [
           task.description,
@@ -72,6 +82,7 @@ export class Dispatcher {
           "",
           designContent,
         ].join("\n");
+        break;
       }
     }
 

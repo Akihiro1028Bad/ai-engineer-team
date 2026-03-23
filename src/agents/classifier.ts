@@ -164,8 +164,54 @@ export class Classifier {
     };
   }
 
-  /** Opus で Issue のスコープを分析し、分割すべきか判定する */
+  /** Opus で Issue のスコープを分析し、分割すべきか判定する（リトライ付き） */
   private async analyzeScope(
+    issue: Issue,
+  ): Promise<{ title: string; description: string }[]> {
+    const MAX_RETRIES = 3;
+    const BACKOFF_MS = [1000, 3000, 9000];
+
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      const result = await this.tryScopeAnalysis(issue);
+      if (result.length > 0) return result;
+
+      if (attempt < MAX_RETRIES - 1) {
+        console.warn(`[Classifier] Scope analysis attempt ${attempt + 1} failed, retrying in ${BACKOFF_MS[attempt]}ms...`);
+        await new Promise((r) => setTimeout(r, BACKOFF_MS[attempt]!));
+      }
+    }
+
+    // 全リトライ失敗 → フォールバックヒューリスティクス
+    console.warn("[Classifier] All Opus retries failed, trying keyword-based fallback");
+    return this.keywordFallbackScope(issue);
+  }
+
+  /** キーワードベースのスコープ分割（Opus 失敗時のフォールバック） */
+  private keywordFallbackScope(issue: Issue): { title: string; description: string }[] {
+    const text = `${issue.title} ${issue.body}`.toLowerCase();
+
+    // 複数画面/コンポーネントのキーワードを検出
+    const SCREEN_KEYWORDS = [
+      "テーブル", "フォーム", "ダイアログ", "モーダル", "ナビゲーション",
+      "ダッシュボード", "一覧", "詳細", "設定", "ログイン",
+      "table", "form", "dialog", "modal", "navigation", "dashboard", "list", "detail",
+    ];
+    const found = SCREEN_KEYWORDS.filter((kw) => text.includes(kw));
+
+    if (found.length >= 3) {
+      console.info(`[Classifier] Keyword fallback: found ${found.length} components → splitting`);
+      return found.map((kw) => ({
+        title: `${kw} の修正`,
+        description: `${issue.title} のうち、${kw} に関連する部分を修正する`,
+      }));
+    }
+
+    console.info("[Classifier] Keyword fallback: not enough components for splitting");
+    return [];
+  }
+
+  /** 単一の Opus スコープ分析試行 */
+  private async tryScopeAnalysis(
     issue: Issue,
   ): Promise<{ title: string; description: string }[]> {
     try {

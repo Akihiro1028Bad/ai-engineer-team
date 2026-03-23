@@ -52,7 +52,7 @@ async function main(): Promise<void> {
 
   const dispatcher = new Dispatcher(worktreeManager, `${config.projectDir}/.claude/handoff`);
   const cronScheduler = new CronScheduler(queue);
-  const githubPoller = new GitHubPoller(octokit as never, queue, owner, repo);
+  const githubPoller = new GitHubPoller(octokit as never, queue, owner, repo, dispatcher);
   const resultCollector = new ResultCollector(octokit as never, slackNotifier, owner, repo);
   const ciMonitor = new CIMonitor(octokit as never, queue, dispatcher, owner, repo, logger);
 
