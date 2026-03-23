@@ -28,6 +28,8 @@ import { PatternMemoryStore } from "./feedback/pattern-memory.js";
 import { ModelRouter } from "./feedback/model-router.js";
 import { PRFeedbackLearner } from "./feedback/pr-feedback-learner.js";
 import { ValidationGate } from "./quality/validation-gate.js";
+import { GeneratorCriticLoop } from "./quality/generator-critic-loop.js";
+import { AgentRunner } from "./execution/agent-runner.js";
 import { DashboardServer } from "./dashboard/server.js";
 import { SkillRegistry } from "./toolforge/skill-registry.js";
 import { Orchestrator } from "./orchestrator.js";
@@ -157,9 +159,16 @@ async function main(): Promise<void> {
 
   const budgetGuard = new BudgetGuard(config.dailyBudgetUsd);
 
-  // Orchestrator（マルチリポ対応）
-  // 最初のリポジトリをプライマリとして使用（後方互換）
+  // v3.0 Execution コンポーネント
   const primary = repoComponents[0]!;
+  const agentRunner = new AgentRunner(
+    primary.worktreeManager,
+    statusEmitter,
+    logger,
+  );
+  const criticLoop = new GeneratorCriticLoop(agentRunner, statusEmitter, logger);
+
+  // Orchestrator（マルチリポ対応）
   const orchestrator = new Orchestrator({
     queue,
     dispatcher: primary.dispatcher,
@@ -191,7 +200,10 @@ async function main(): Promise<void> {
       stalePRReminder: rc.stalePRReminder,
       dispatcher: rc.dispatcher,
     })),
+    agentRunner,
+    criticLoop,
     dryRunDefault: config.dryRunDefault,
+    enableV3Planning: true,
   });
 
   // Dashboard サーバー
