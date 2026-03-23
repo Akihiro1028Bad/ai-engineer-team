@@ -159,8 +159,21 @@ export class CIMonitor {
 
       // 完了 or 失敗 → ci_checking に戻して CI を再確認
       this.queue.updateStatus(task.id, "ci_checking", { prNumber: task.prNumber ?? undefined });
+
+      // impl 完了時は @claude /review をリクエスト
+      if (implTask?.status === "completed" && task.prNumber) {
+        try {
+          await this.octokit.issues.createComment({
+            owner: this.owner,
+            repo: this.repo,
+            issue_number: task.prNumber,
+            body: "@claude /review",
+          });
+        } catch { /* non-critical */ }
+      }
+
       this.logger.info(
-        { taskId: task.id, fixTaskId, fixResult: fixTask.status },
+        { taskId: task.id, fixTaskId: implTaskId, fixResult: taskToCheck.status },
         "CI fix task done, returning to ci_checking",
       );
     }
