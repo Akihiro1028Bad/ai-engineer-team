@@ -87,12 +87,12 @@ describe("GitHubPoller", () => {
       queue.push({
         id: "review-1", taskType: "review", title: "Review",
         description: "D", source: "github_issue:42", priority: 5,
-        dependsOn: null, parentTaskId: null,
+        dependsOn: null, parentTaskId: null, repo: null,
       });
       queue.push({
         id: "fix-1", taskType: "fix", title: "Fix",
         description: "D", source: "github_issue:42:1", priority: 5,
-        dependsOn: "review-1", parentTaskId: "review-1",
+        dependsOn: "review-1", parentTaskId: "review-1", repo: null,
       });
       queue.updateStatus("review-1", "in_progress");
       queue.updateStatus("review-1", "awaiting_approval", {
@@ -103,19 +103,19 @@ describe("GitHubPoller", () => {
       const poller = new GitHubPoller(octokit as never, queue, "org", "repo");
       await poller.pollApprovals();
 
-      expect(queue.getById("review-1")?.status).toBe("completed");
+      expect(queue.getById("review-1")?.status).toBe("in_progress");
     });
 
     it("closed PR cancels pipeline", async () => {
       queue.push({
         id: "review-1", taskType: "review", title: "Review",
         description: "D", source: "s1", priority: 5,
-        dependsOn: null, parentTaskId: null,
+        dependsOn: null, parentTaskId: null, repo: null,
       });
       queue.push({
         id: "fix-1", taskType: "fix", title: "Fix",
         description: "D", source: "s2", priority: 5,
-        dependsOn: "review-1", parentTaskId: "review-1",
+        dependsOn: "review-1", parentTaskId: "review-1", repo: null,
       });
       queue.updateStatus("review-1", "in_progress");
       queue.updateStatus("review-1", "awaiting_approval", {

@@ -36,6 +36,7 @@ export class CronScheduler {
           priority: 5,
           dependsOn: null,
           parentTaskId: null,
+          repo: null,
         });
       }
     }
@@ -54,6 +55,7 @@ export class CronScheduler {
           priority: 7,
           dependsOn: null,
           parentTaskId: null,
+          repo: null,
         });
       }
     }

@@ -293,6 +293,7 @@ export class CIMonitor {
         priority: 1,
         dependsOn: null,
         parentTaskId: null,
+        repo: `${this.owner}/${this.repo}`,
       },
       {
         id: implTaskId,
@@ -315,6 +316,7 @@ export class CIMonitor {
         priority: 1,
         dependsOn: reviewTaskId,
         parentTaskId: null,
+        repo: `${this.owner}/${this.repo}`,
       },
     ]);
 

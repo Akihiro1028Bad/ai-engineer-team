@@ -243,6 +243,7 @@ async function main(): Promise<void> {
     skillRegistry,
     repoComponents: repoComponents.map((rc) => ({
       repoId: rc.repoConfig.id,
+      githubRepo: rc.repoConfig.githubRepo,
       githubPoller: rc.githubPoller,
       resultCollector: rc.resultCollector,
       ciMonitor: rc.ciMonitor,

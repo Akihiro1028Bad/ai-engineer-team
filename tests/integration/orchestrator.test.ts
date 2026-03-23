@@ -72,6 +72,7 @@ describe("Orchestrator integration", () => {
       priority: 5,
       dependsOn: null,
       parentTaskId: null,
+      repo: null,
     });
 
     const orch = new Orchestrator(deps);
@@ -104,6 +105,7 @@ describe("Orchestrator integration", () => {
       priority: 5,
       dependsOn: null,
       parentTaskId: null,
+      repo: null,
     });
 
     const orch = new Orchestrator(deps);
@@ -127,6 +129,7 @@ describe("Orchestrator integration", () => {
       priority: 5,
       dependsOn: null,
       parentTaskId: null,
+      repo: null,
     });
 
     const orch = new Orchestrator(deps);
@@ -147,6 +150,7 @@ describe("Orchestrator integration", () => {
       priority: 5,
       dependsOn: null,
       parentTaskId: null,
+      repo: null,
     });
     deps.queue.updateStatus("crashed", "in_progress");
 

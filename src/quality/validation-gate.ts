@@ -8,6 +8,8 @@ interface ValidationInput {
   planId: string;
   /** エージェントの構造化出力 */
   structuredOutput?: unknown;
+  /** エージェントのテキスト出力 (result フィールド) */
+  result?: string;
   /** 期待される Zod スキーマの safeParse 関数 */
   schemaParse?: (data: unknown) => { success: boolean; error?: { message: string } };
   /** diff テキスト */
@@ -43,8 +45,10 @@ export class ValidationGate {
       });
     }
 
-    // 2. 完全性チェック
-    const hasOutput = input.structuredOutput !== null && input.structuredOutput !== undefined;
+    // 2. 完全性チェック（構造化出力 or テキスト結果のいずれかがあれば OK）
+    const hasStructuredOutput = input.structuredOutput !== null && input.structuredOutput !== undefined;
+    const hasTextResult = typeof input.result === "string" && input.result.length > 0;
+    const hasOutput = hasStructuredOutput || hasTextResult;
     checks.push({
       name: "completeness",
       passed: hasOutput,

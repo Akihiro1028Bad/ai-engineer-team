@@ -35,6 +35,7 @@ interface TaskRow {
   approval_pr_url: string | null;
   pr_number: number | null;
   ci_fix_count: number;
+  repo: string | null;
   created_at: string;
   started_at: string | null;
   completed_at: string | null;
@@ -59,6 +60,7 @@ function rowToTask(row: TaskRow): Task {
     approvalPrUrl: row.approval_pr_url,
     prNumber: row.pr_number,
     ciFixCount: row.ci_fix_count,
+    repo: row.repo,
     createdAt: row.created_at,
     startedAt: row.started_at,
     completedAt: row.completed_at,
@@ -75,8 +77,8 @@ export class TaskQueue {
 
   constructor(private readonly db: Database.Database) {
     this.stmtInsert = db.prepare(`
-      INSERT INTO tasks (id, task_type, title, description, source, priority, depends_on, parent_task_id)
-      VALUES (@id, @taskType, @title, @description, @source, @priority, @dependsOn, @parentTaskId)
+      INSERT INTO tasks (id, task_type, title, description, source, priority, depends_on, parent_task_id, repo)
+      VALUES (@id, @taskType, @title, @description, @source, @priority, @dependsOn, @parentTaskId, @repo)
     `);
 
     this.stmtGetNext = db.prepare(`
@@ -104,6 +106,7 @@ export class TaskQueue {
       priority: input.priority,
       dependsOn: input.dependsOn,
       parentTaskId: input.parentTaskId,
+      repo: input.repo ?? null,
     });
   }
 
@@ -181,7 +184,7 @@ export class TaskQueue {
   }
 
   approveTask(id: string): void {
-    this.updateStatus(id, "completed");
+    this.updateStatus(id, "in_progress");
   }
 
   rejectTask(id: string): void {

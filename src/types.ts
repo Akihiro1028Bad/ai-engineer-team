@@ -57,6 +57,8 @@ export const CreateTaskInputSchema = z.object({
   priority: z.number().int().min(1).max(10).optional().default(5),
   dependsOn: z.string().nullable().optional().default(null),
   parentTaskId: z.string().nullable().optional().default(null),
+  /** リポジトリ識別子 (owner/repo 形式) */
+  repo: z.string().nullable().optional().default(null),
 });
 export type CreateTaskInput = z.infer<typeof CreateTaskInputSchema>;
 

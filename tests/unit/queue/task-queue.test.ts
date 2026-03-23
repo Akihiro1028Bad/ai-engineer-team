@@ -14,6 +14,7 @@ function makeInput(overrides: Partial<CreateTaskInput> = {}): CreateTaskInput {
     priority: overrides.priority ?? 5,
     dependsOn: overrides.dependsOn ?? null,
     parentTaskId: overrides.parentTaskId ?? null,
+    repo: overrides.repo ?? null,
   };
 }
 
@@ -185,7 +186,11 @@ describe("TaskQueue", () => {
       queue.updateStatus("review", "awaiting_approval", { approvalPrUrl: "https://pr/1" });
       queue.approveTask("review");
       const review = queue.getById("review");
-      expect(review?.status).toBe("completed");
+      expect(review?.status).toBe("in_progress");
+      // After approval, the orchestrator will resume the task and eventually complete it.
+      // The successor should not yet be unblocked since review is in_progress, not completed.
+      // Manually complete to verify successor is unblocked.
+      queue.updateStatus("review", "completed");
       expect(queue.getNext()?.id).toBe("fix");
     });
 

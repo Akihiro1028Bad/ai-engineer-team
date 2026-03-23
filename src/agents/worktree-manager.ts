@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { existsSync, rmSync } from "node:fs";
 
 type ExecFn = (cmd: string, args: string[]) => Buffer;
 
@@ -32,6 +33,16 @@ export class WorktreeManager {
     try {
       this.exec("git", ["-C", this.projectDir, "worktree", "remove", worktreePath, "--force"]);
     } catch { /* ignore */ }
+
+    // 2.5. stale worktree エントリを prune し、残留ディレクトリも削除
+    try {
+      this.exec("git", ["-C", this.projectDir, "worktree", "prune"]);
+    } catch { /* ignore */ }
+    if (existsSync(worktreePath)) {
+      try {
+        rmSync(worktreePath, { recursive: true, force: true });
+      } catch { /* ignore */ }
+    }
 
     // 3. 既存の同名ブランチがあれば削除
     try {

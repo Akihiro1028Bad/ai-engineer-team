@@ -51,6 +51,7 @@ export function parseAndPush(args: string[], queue: TaskQueue): ParseResult {
     priority,
     dependsOn,
     parentTaskId: null,
+    repo: null,
   });
 
   return { success: true };

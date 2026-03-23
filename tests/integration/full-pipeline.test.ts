@@ -67,8 +67,8 @@ describe("Full pipeline (design-first flow)", () => {
   });
 
   it("pipeline with approval gate flow", () => {
-    queue.push({ id: "r", taskType: "review", title: "Review", description: "D", source: "s0", priority: 5, dependsOn: null, parentTaskId: null });
-    queue.push({ id: "f", taskType: "fix", title: "Fix", description: "D", source: "s1", priority: 5, dependsOn: "r", parentTaskId: "r" });
+    queue.push({ id: "r", taskType: "review", title: "Review", description: "D", source: "s0", priority: 5, dependsOn: null, parentTaskId: null, repo: null });
+    queue.push({ id: "f", taskType: "fix", title: "Fix", description: "D", source: "s1", priority: 5, dependsOn: "r", parentTaskId: "r", repo: null });
 
     // Review completes → awaiting approval
     queue.updateStatus("r", "in_progress");
@@ -77,8 +77,11 @@ describe("Full pipeline (design-first flow)", () => {
     // Fix should be blocked
     expect(queue.getNext()).toBeNull();
 
-    // Approve → review completed → fix available
+    // Approve → review goes to in_progress (orchestrator will resume and complete it)
     queue.approveTask("r");
+    expect(queue.getById("r")?.status).toBe("in_progress");
+    // Simulate orchestrator completing the review after approval
+    queue.updateStatus("r", "completed");
     expect(queue.getNext()?.id).toBe("f");
   });
 });

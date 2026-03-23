@@ -19,7 +19,7 @@ export function initSchema(db: Database.Database): void {
       source TEXT NOT NULL,
       priority INTEGER NOT NULL DEFAULT 5 CHECK(priority BETWEEN 1 AND 10),
       status TEXT NOT NULL DEFAULT 'pending'
-        CHECK(status IN ('pending','in_progress','completed','failed','awaiting_approval','ci_checking','ci_passed','ci_fixing','ci_failed')),
+        CHECK(status IN ('pending','in_progress','completed','failed','awaiting_approval','ci_checking','ci_passed','ci_fixing','ci_failed','planning','validating')),
       pr_number INTEGER,
       ci_fix_count INTEGER NOT NULL DEFAULT 0,
       result TEXT,
@@ -30,6 +30,7 @@ export function initSchema(db: Database.Database): void {
       parent_task_id TEXT REFERENCES tasks(id),
       context_file TEXT,
       approval_pr_url TEXT,
+      repo TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       started_at TEXT,
       completed_at TEXT

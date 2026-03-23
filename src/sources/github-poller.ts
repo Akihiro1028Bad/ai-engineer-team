@@ -232,6 +232,7 @@ export class GitHubPoller {
           priority: triage.priority,
           dependsOn: null,
           parentTaskId: null,
+          repo: `${this.owner}/${this.repo}`,
         });
         continue;
       }
@@ -250,6 +251,7 @@ export class GitHubPoller {
         priority: triage.priority,
         dependsOn: sub.dependsOnIndex !== null ? `${prefix}-${sub.dependsOnIndex}` : null,
         parentTaskId: `${prefix}-0`,
+        repo: `${this.owner}/${this.repo}`,
       }));
       this.queue.pushPipeline(tasks);
     }
@@ -398,6 +400,7 @@ export class GitHubPoller {
       priority: 10,
       dependsOn: null,
       parentTaskId: null,
+      repo: `${this.owner}/${this.repo}`,
     });
     this.queue.updateStatus(markerId, "completed");
 
@@ -441,6 +444,7 @@ export class GitHubPoller {
       approvalPrUrl: null,
       prNumber: null,
       ciFixCount: 0,
+      repo: `${this.owner}/${this.repo}`,
       createdAt: new Date().toISOString(),
       startedAt: new Date().toISOString(),
       completedAt: null,

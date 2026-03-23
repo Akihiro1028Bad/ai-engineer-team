@@ -37,6 +37,8 @@ import type { ExecutionPlan } from "./types/execution-plan.js";
 /** リポジトリごとのコンポーネント参照 */
 export interface RepoRef {
   repoId: string;
+  /** "owner/repo" 形式のリポジトリ識別子 */
+  githubRepo?: string;
   githubPoller: GitHubPoller;
   resultCollector: ResultCollector;
   ciMonitor: CIMonitor;
@@ -537,6 +539,7 @@ export class Orchestrator {
             nodeId: node.id,
             planId: plan.taskId,
             structuredOutput: result.structuredOutput,
+            result: result.result,
           });
 
           if (!validation.passed) {
@@ -668,6 +671,7 @@ export class Orchestrator {
           nodeId: taskId,
           planId: taskId,
           structuredOutput: result.structuredOutput,
+          result: result.result,
           diff: result.result,
           diffLines: 0,
           deletedFiles: [],
@@ -824,24 +828,36 @@ export class Orchestrator {
     return false;
   }
 
-  /** タスク ID からリポジトリの GitHubPoller を特定する */
-  private findPollerForTask(_taskId: string): GitHubPoller | undefined {
-    if (this.deps.repoComponents && this.deps.repoComponents.length > 0) {
-      // TODO: タスクの repo フィールドで特定
-      const first = this.deps.repoComponents[0];
-      if (!first) return undefined;
-      return first.githubPoller;
+  /** タスク ID からリポジトリの RepoRef を特定する */
+  private findRepoForTask(taskId: string): RepoRef | undefined {
+    if (!this.deps.repoComponents || this.deps.repoComponents.length === 0) {
+      return undefined;
     }
+
+    // タスクの repo フィールドで特定 (repo は "owner/repo" 形式)
+    const task = this.deps.queue.getById(taskId);
+    if (task?.repo) {
+      const match = this.deps.repoComponents.find((rc) =>
+        rc.githubRepo === task.repo || rc.repoId === task.repo,
+      );
+      if (match) return match;
+    }
+
+    // フォールバック: 最初のリポジトリ
+    return this.deps.repoComponents[0];
+  }
+
+  /** タスク ID からリポジトリの GitHubPoller を特定する */
+  private findPollerForTask(taskId: string): GitHubPoller | undefined {
+    const repo = this.findRepoForTask(taskId);
+    if (repo) return repo.githubPoller;
     return this.deps.githubPoller;
   }
 
   /** タスク ID からリポジトリの ResultCollector を特定する */
-  private findCollectorForTask(_taskId: string): ResultCollector | undefined {
-    if (this.deps.repoComponents && this.deps.repoComponents.length > 0) {
-      const first = this.deps.repoComponents[0];
-      if (!first) return undefined;
-      return first.resultCollector;
-    }
+  private findCollectorForTask(taskId: string): ResultCollector | undefined {
+    const repo = this.findRepoForTask(taskId);
+    if (repo) return repo.resultCollector;
     return this.deps.resultCollector;
   }
 

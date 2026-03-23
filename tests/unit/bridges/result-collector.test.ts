@@ -22,6 +22,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     approvalPrUrl: null,
     prNumber: null,
     ciFixCount: 0,
+    repo: null,
     createdAt: new Date().toISOString(),
     startedAt: new Date().toISOString(),
     completedAt: new Date().toISOString(),

@@ -25,8 +25,14 @@ const MIGRATIONS: Migration[] = [
         ALTER TABLE tasks ADD COLUMN dag_node_id TEXT DEFAULT NULL;
         ALTER TABLE tasks ADD COLUMN validation_status TEXT DEFAULT NULL;
         ALTER TABLE tasks ADD COLUMN model_used TEXT DEFAULT NULL;
-        ALTER TABLE tasks ADD COLUMN repo TEXT DEFAULT NULL;
       `);
+      // repo column is now part of the base schema (initSchema);
+      // add it only if missing (for databases created before repo was in base schema)
+      try {
+        db.exec(`ALTER TABLE tasks ADD COLUMN repo TEXT DEFAULT NULL;`);
+      } catch {
+        // Column already exists — ignore
+      }
 
       // Execution Plans テーブル
       db.exec(`
@@ -124,6 +130,60 @@ const MIGRATIONS: Migration[] = [
           created_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
         CREATE INDEX IF NOT EXISTS idx_handoff_plan ON handoff_reports(plan_id);
+      `);
+    },
+  },
+  {
+    version: 3,
+    description: "v3.0: Add planning/validating status, repo column to tasks CHECK constraint",
+    up: (db) => {
+      // SQLite does not support ALTER TABLE ... ALTER CONSTRAINT.
+      // Recreate the tasks table with the updated CHECK constraint.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS tasks_new (
+          id TEXT PRIMARY KEY,
+          task_type TEXT NOT NULL CHECK(task_type IN ('review','fix','build','document')),
+          title TEXT NOT NULL,
+          description TEXT NOT NULL,
+          source TEXT NOT NULL,
+          priority INTEGER NOT NULL DEFAULT 5 CHECK(priority BETWEEN 1 AND 10),
+          status TEXT NOT NULL DEFAULT 'pending'
+            CHECK(status IN ('pending','in_progress','completed','failed','awaiting_approval','ci_checking','ci_passed','ci_fixing','ci_failed','planning','validating')),
+          pr_number INTEGER,
+          ci_fix_count INTEGER NOT NULL DEFAULT 0,
+          result TEXT,
+          cost_usd REAL NOT NULL DEFAULT 0,
+          turns_used INTEGER NOT NULL DEFAULT 0,
+          retry_count INTEGER NOT NULL DEFAULT 0 CHECK(retry_count <= 3),
+          depends_on TEXT REFERENCES tasks_new(id),
+          parent_task_id TEXT REFERENCES tasks_new(id),
+          context_file TEXT,
+          approval_pr_url TEXT,
+          execution_plan_id TEXT,
+          dag_node_id TEXT,
+          validation_status TEXT,
+          model_used TEXT,
+          repo TEXT,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          started_at TEXT,
+          completed_at TEXT
+        );
+
+        INSERT INTO tasks_new SELECT
+          id, task_type, title, description, source, priority, status,
+          pr_number, ci_fix_count, result, cost_usd, turns_used, retry_count,
+          depends_on, parent_task_id, context_file, approval_pr_url,
+          execution_plan_id, dag_node_id, validation_status, model_used, repo,
+          created_at, started_at, completed_at
+        FROM tasks;
+
+        DROP TABLE tasks;
+        ALTER TABLE tasks_new RENAME TO tasks;
+
+        CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+        CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks(priority);
+        CREATE INDEX IF NOT EXISTS idx_tasks_depends_on ON tasks(depends_on);
+        CREATE INDEX IF NOT EXISTS idx_tasks_parent ON tasks(parent_task_id);
       `);
     },
   },
