@@ -19,7 +19,9 @@ export function initSchema(db: Database.Database): void {
       source TEXT NOT NULL,
       priority INTEGER NOT NULL DEFAULT 5 CHECK(priority BETWEEN 1 AND 10),
       status TEXT NOT NULL DEFAULT 'pending'
-        CHECK(status IN ('pending','in_progress','completed','failed','awaiting_approval')),
+        CHECK(status IN ('pending','in_progress','completed','failed','awaiting_approval','ci_checking','ci_passed','ci_fixing','ci_failed')),
+      pr_number INTEGER,
+      ci_fix_count INTEGER NOT NULL DEFAULT 0,
       result TEXT,
       cost_usd REAL NOT NULL DEFAULT 0,
       turns_used INTEGER NOT NULL DEFAULT 0,

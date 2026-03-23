@@ -11,6 +11,10 @@ export const TaskStatusSchema = z.enum([
   "completed",
   "failed",
   "awaiting_approval",
+  "ci_checking",
+  "ci_passed",
+  "ci_fixing",
+  "ci_failed",
 ]);
 export type TaskStatus = z.infer<typeof TaskStatusSchema>;
 
@@ -41,6 +45,8 @@ export const TaskSchema = CreateTaskInputSchema.extend({
   retryCount: z.number().int().min(0).max(3).default(0),
   contextFile: z.string().nullable().default(null),
   approvalPrUrl: z.string().nullable().default(null),
+  prNumber: z.number().int().nullable().default(null),
+  ciFixCount: z.number().int().default(0),
   createdAt: z.string(),
   startedAt: z.string().nullable().default(null),
   completedAt: z.string().nullable().default(null),

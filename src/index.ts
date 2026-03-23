@@ -10,6 +10,7 @@ import { Dispatcher } from "./agents/dispatcher.js";
 import { CronScheduler } from "./sources/cron-scheduler.js";
 import { GitHubPoller } from "./sources/github-poller.js";
 import { ResultCollector } from "./bridges/result-collector.js";
+import { CIMonitor } from "./sources/ci-monitor.js";
 import { CircuitBreaker } from "./safety/circuit-breaker.js";
 import { RateController } from "./safety/rate-controller.js";
 import { BudgetGuard } from "./safety/budget-guard.js";
@@ -53,6 +54,7 @@ async function main(): Promise<void> {
   const cronScheduler = new CronScheduler(queue);
   const githubPoller = new GitHubPoller(octokit as never, queue, owner, repo);
   const resultCollector = new ResultCollector(octokit as never, slackNotifier, owner, repo);
+  const ciMonitor = new CIMonitor(octokit as never, queue, dispatcher, owner, repo, logger);
 
   const circuitBreaker = new CircuitBreaker(5, 3_600_000, () => {
     void slackNotifier.send({
@@ -80,6 +82,7 @@ async function main(): Promise<void> {
     cronScheduler,
     githubPoller,
     resultCollector,
+    ciMonitor,
     circuitBreaker,
     rateController,
     budgetGuard,

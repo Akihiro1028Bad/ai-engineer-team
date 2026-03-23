@@ -5,6 +5,7 @@ import { taskTypeToRole } from "./agents/role-mapping.js";
 import type { CronScheduler } from "./sources/cron-scheduler.js";
 import type { GitHubPoller } from "./sources/github-poller.js";
 import type { ResultCollector } from "./bridges/result-collector.js";
+import type { CIMonitor } from "./sources/ci-monitor.js";
 import type { CircuitBreaker } from "./safety/circuit-breaker.js";
 import type { RateController } from "./safety/rate-controller.js";
 import type { BudgetGuard } from "./safety/budget-guard.js";
@@ -18,6 +19,7 @@ export interface OrchestratorDeps {
   cronScheduler: CronScheduler;
   githubPoller?: GitHubPoller;
   resultCollector?: ResultCollector;
+  ciMonitor?: CIMonitor;
   circuitBreaker: CircuitBreaker;
   rateController: RateController;
   budgetGuard: BudgetGuard;
@@ -67,6 +69,11 @@ export class Orchestrator {
       await this.deps.githubPoller.pollIssues();
       await this.deps.githubPoller.pollComments();
       await this.deps.githubPoller.pollApprovals();
+    }
+
+    // CI 監視
+    if (this.deps.ciMonitor) {
+      await this.deps.ciMonitor.checkPendingPRs();
     }
 
     budgetGuard.checkDailyReset();
@@ -146,14 +153,26 @@ export class Orchestrator {
           const prResult = await prMethod;
 
           if (prResult.success && prResult.prUrl) {
-            logger.info({ taskId, prUrl: prResult.prUrl }, "PR created");
+            const prNum = this.extractPrNumber(prResult.prUrl);
+            logger.info({ taskId, prUrl: prResult.prUrl }, "PR created, starting CI monitoring");
+
+            // CI 監視開始
+            queue.updateStatus(taskId, "completed", {
+              result: result.result,
+              costUsd: result.costUsd,
+              turnsUsed: result.turnsUsed,
+            });
+            if (prNum) {
+              queue.updateStatus(taskId, "ci_checking", { prNumber: prNum });
+            }
 
             if (this.deps.githubPoller) {
               await this.deps.githubPoller.postResultToIssue(
                 taskId,
-                `✅ 修正が完了し、PRを作成しました。\n\nPR: ${prResult.prUrl}\n\n${result.result ?? ""}`,
+                `✅ 修正が完了し、PRを作成しました。CI の結果を監視中です...\n\nPR: ${prResult.prUrl}\n\n${result.result ?? ""}`,
               );
             }
+            return; // ci_checking に遷移したので以降の completed 更新をスキップ
           }
         }
       } else if (this.deps.githubPoller && result.result) {
@@ -161,7 +180,7 @@ export class Orchestrator {
         await this.deps.githubPoller.postResultToIssue(taskId, result.result);
       }
 
-      // completed に更新
+      // completed に更新（PR 未作成 or 変更なしの場合）
       queue.updateStatus(taskId, "completed", {
         result: result.result,
         costUsd: result.costUsd,
@@ -217,6 +236,11 @@ export class Orchestrator {
 
   isRunning(): boolean {
     return this.running;
+  }
+
+  private extractPrNumber(url: string): number | null {
+    const match = /\/pull\/(\d+)/.exec(url);
+    return match ? Number(match[1]) : null;
   }
 
   private sleep(ms: number): Promise<void> {

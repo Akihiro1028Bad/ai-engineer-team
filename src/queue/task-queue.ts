@@ -6,6 +6,7 @@ interface UpdateData {
   costUsd?: number;
   turnsUsed?: number;
   approvalPrUrl?: string;
+  prNumber?: number;
 }
 
 interface DailyDigest {
@@ -32,6 +33,8 @@ interface TaskRow {
   parent_task_id: string | null;
   context_file: string | null;
   approval_pr_url: string | null;
+  pr_number: number | null;
+  ci_fix_count: number;
   created_at: string;
   started_at: string | null;
   completed_at: string | null;
@@ -54,6 +57,8 @@ function rowToTask(row: TaskRow): Task {
     parentTaskId: row.parent_task_id,
     contextFile: row.context_file,
     approvalPrUrl: row.approval_pr_url,
+    prNumber: row.pr_number,
+    ciFixCount: row.ci_fix_count,
     createdAt: row.created_at,
     startedAt: row.started_at,
     completedAt: row.completed_at,
@@ -146,7 +151,15 @@ export class TaskQueue {
       this.db
         .prepare("UPDATE tasks SET status = ?, approval_pr_url = ? WHERE id = ?")
         .run(status, data?.approvalPrUrl ?? null, id);
-    } else if (status === "failed") {
+    } else if (status === "ci_checking") {
+      this.db
+        .prepare("UPDATE tasks SET status = ?, pr_number = ? WHERE id = ?")
+        .run(status, data?.prNumber ?? null, id);
+    } else if (status === "ci_fixing") {
+      this.db
+        .prepare("UPDATE tasks SET status = ?, ci_fix_count = ci_fix_count + 1 WHERE id = ?")
+        .run(status, id);
+    } else if (status === "failed" || status === "ci_failed") {
       this.db.prepare("UPDATE tasks SET status = ?, completed_at = ? WHERE id = ?").run(status, now, id);
     } else {
       this.db.prepare("UPDATE tasks SET status = ? WHERE id = ?").run(status, id);
