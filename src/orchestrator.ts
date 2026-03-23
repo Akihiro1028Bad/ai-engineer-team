@@ -131,6 +131,43 @@ export class Orchestrator {
       circuitBreaker.recordSuccess();
       budgetGuard.recordCost(result.costUsd);
 
+      // フィードバック修正タスクの場合 → PR にコメントで返信
+      const isFeedbackTask = taskId.includes("-feedback-");
+      if (isFeedbackTask && result.pushed && this.deps.githubPoller) {
+        // PR 番号をタスク title から抽出
+        const prMatch = /PR #(\d+)/.exec(task.title);
+        if (prMatch) {
+          const prNum = Number(prMatch[1]);
+          await this.deps.githubPoller.postResultToIssue(
+            taskId,
+            `✏️ フィードバックを反映して設計書を修正しました。再度ご確認ください。\n\n${result.result ?? ""}`,
+          );
+          // PR にも直接コメント
+          try {
+            const octokit = (this.deps.githubPoller as unknown as { octokit: { issues: { createComment: (p: { owner: string; repo: string; issue_number: number; body: string }) => Promise<unknown> } } }).octokit;
+            const owner = (this.deps.githubPoller as unknown as { owner: string }).owner;
+            const repo = (this.deps.githubPoller as unknown as { repo: string }).repo;
+            await octokit.issues.createComment({
+              owner,
+              repo,
+              issue_number: prNum,
+              body: `🤖 **AI Agent Orchestrator**\n\n✏️ フィードバックを反映して設計書を修正しました。再度ご確認ください。\n\n変更を確認後、「承認」とコメントしてください。`,
+            });
+          } catch { /* non-critical */ }
+        }
+
+        queue.updateStatus(taskId, "completed", {
+          result: result.result,
+          costUsd: result.costUsd,
+          turnsUsed: result.turnsUsed,
+        });
+
+        // 🚀 リアクション
+        void this.deps.githubPoller.reactToIssue(taskId, "rocket");
+        logger.info({ taskId, pushed: result.pushed }, "Design feedback applied");
+        return;
+      }
+
       // PR 作成フロー
       if (result.pushed && result.branch && resultCollector) {
         if (task.taskType === "review") {
