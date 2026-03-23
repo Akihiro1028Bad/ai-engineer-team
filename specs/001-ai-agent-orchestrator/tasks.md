@@ -228,13 +228,13 @@
 
 ### テスト作成 & 実装
 
-- [ ] T056 [P] [US3] **RED テスト**: `tests/integration/full-pipeline.test.ts` を作成する。Agent SDK, Octokit, Slack をモックし、(1) feature Issue → Classifier が review→build→document の 3 ステップに分解、(2) Reviewer 完了→設計PR→approve→Builder→Scribe→最終PR、(3) Builder の diff が 500 行超過→分割要求。test-cases.md の T-ORC-003 の完全版 → `tests/integration/full-pipeline.test.ts`
+- [x] T056 [P] [US3] **RED テスト**: `tests/integration/full-pipeline.test.ts` を作成する。Agent SDK, Octokit, Slack をモックし、(1) feature Issue → Classifier が review→build→document の 3 ステップに分解、(2) Reviewer 完了→設計PR→approve→Builder→Scribe→最終PR、(3) Builder の diff が 500 行超過→分割要求。test-cases.md の T-ORC-003 の完全版 → `tests/integration/full-pipeline.test.ts`
 
-- [ ] T057 [US3] `src/agents/classifier.ts` の `classify()` を更新し、`feature`/`enhancement` ラベルで `review → build → document` の 3 ステップパイプラインを生成するようにする。T045 の T-CLS-002 テストケースが GREEN になることを確認
+- [x] T057 [US3] `src/agents/classifier.ts` の `classify()` を更新し、`feature`/`enhancement` ラベルで `review → build → document` の 3 ステップパイプラインを生成するようにする。T045 の T-CLS-002 テストケースが GREEN になることを確認
 
-- [ ] T058 [US3] `src/agents/dispatcher.ts` を更新し、Builder と Scribe のエージェント実行をサポートする。Builder の `cwd` は `WORKTREE_DIR/builder`、Scribe は `WORKTREE_DIR/scribe` を使用する。`getAgentConfig()` で正しい設定が適用されることを確認
+- [x] T058 [US3] `src/agents/dispatcher.ts` を更新し、Builder と Scribe のエージェント実行をサポートする。Builder の `cwd` は `WORKTREE_DIR/builder`、Scribe は `WORKTREE_DIR/scribe` を使用する。`getAgentConfig()` で正しい設定が適用されることを確認
 
-- [ ] T059 [US3] `src/bridges/result-collector.ts` を更新し、3 エージェント以上のパイプライン最終PR作成をサポートする。全エージェントの変更を含む PR を作成する。T056 が GREEN になることを確認
+- [x] T059 [US3] `src/bridges/result-collector.ts` を更新し、3 エージェント以上のパイプライン最終PR作成をサポートする。全エージェントの変更を含む PR を作成する。T056 が GREEN になることを確認
 
 **Checkpoint**: US3 完了。feature Issue → review → build → document → PR。全テスト GREEN。
 
@@ -246,15 +246,15 @@
 
 ### テスト作成 & 実装
 
-- [ ] T060 [P] [US4] **RED テスト → GREEN 実装**: Daily digest 集計テストを `tests/unit/queue/task-queue.test.ts` に追加する（T-TQ-027 がまだ通っていなければ修正）。`getDailyDigest()` が完了数・失敗数・コスト合計・PR 数・平均所要時間・未承認PR件数を正しく返すことを検証
+- [x] T060 [P] [US4] **RED テスト → GREEN 実装**: Daily digest 集計テストを `tests/unit/queue/task-queue.test.ts` に追加する（T-TQ-027 がまだ通っていなければ修正）。`getDailyDigest()` が完了数・失敗数・コスト合計・PR 数・平均所要時間・未承認PR件数を正しく返すことを検証
 
-- [ ] T061 [P] [US4] **RED テスト → GREEN 実装**: `src/orchestrator.ts` に Daily digest 送信を追加する。毎日 08:00 に `getDailyDigest()` → `SlackNotifier.send(daily_digest)` を呼び出す。`vi.useFakeTimers()` でテスト。test-cases.md の T-ORC-013 に対応
+- [x] T061 [P] [US4] **RED テスト → GREEN 実装**: `src/orchestrator.ts` に Daily digest 送信を追加する。毎日 08:00 に `getDailyDigest()` → `SlackNotifier.send(daily_digest)` を呼び出す。`vi.useFakeTimers()` でテスト。test-cases.md の T-ORC-013 に対応
 
-- [ ] T062 [P] [US4] **RED テスト → GREEN 実装**: `src/orchestrator.ts` の安全機構統合テストを追加する。(1) Circuit Breaker OPEN 中はタスクを取り出さない（T-ORC-004）、(2) Rate Controller クールダウン中は sleep 後に実行（T-ORC-005）、(3) Budget Guard 停止中はタスクを取り出さない（T-ORC-006）。各安全機構の `canExecute()` をモック/スパイし、Orchestrator のメインループが正しく制御されることを検証
+- [x] T062 [P] [US4] **RED テスト → GREEN 実装**: `src/orchestrator.ts` の安全機構統合テストを追加する。(1) Circuit Breaker OPEN 中はタスクを取り出さない（T-ORC-004）、(2) Rate Controller クールダウン中は sleep 後に実行（T-ORC-005）、(3) Budget Guard 停止中はタスクを取り出さない（T-ORC-006）。各安全機構の `canExecute()` をモック/スパイし、Orchestrator のメインループが正しく制御されることを検証
 
-- [ ] T063 [US4] `ai-engineer.service` systemd ユニットファイルを作成する。以下の設定を記述する: `[Unit] Description=AI Engineering Team Orchestrator, After=network.target`, `[Service] Type=simple, WorkingDirectory=/home/user/ai-engineer, EnvironmentFile=/home/user/ai-engineer/.env, ExecStart=/usr/bin/node /home/user/ai-engineer/dist/src/index.js, Restart=always, RestartSec=30`, `[Install] WantedBy=default.target`。設計書 `AI_Engineering_Team_設計書_v2.1.md` セクション 12.5 を参照 → `ai-engineer.service`
+- [x] T063 [US4] `ai-engineer.service` systemd ユニットファイルを作成する。以下の設定を記述する: `[Unit] Description=AI Engineering Team Orchestrator, After=network.target`, `[Service] Type=simple, WorkingDirectory=/home/user/ai-engineer, EnvironmentFile=/home/user/ai-engineer/.env, ExecStart=/usr/bin/node /home/user/ai-engineer/dist/src/index.js, Restart=always, RestartSec=30`, `[Install] WantedBy=default.target`。設計書 `AI_Engineering_Team_設計書_v2.1.md` セクション 12.5 を参照 → `ai-engineer.service`
 
-- [ ] T064 [US4] `src/orchestrator.ts` の `start()` にログローテーション呼び出しを追加する。**起動時**に `rotateOldLogs()` を実行し、さらに**毎日 00:00 に定期実行**するスケジュールをメインループに追加する（FR-027 の 30 日保持 + 自動削除を長時間稼働中も保証する）
+- [x] T064 [US4] `src/orchestrator.ts` の `start()` にログローテーション呼び出しを追加する。**起動時**に `rotateOldLogs()` を実行し、さらに**毎日 00:00 に定期実行**するスケジュールをメインループに追加する（FR-027 の 30 日保持 + 自動削除を長時間稼働中も保証する）
 
 **Checkpoint**: US4 完了。安全機構が Orchestrator に統合され、systemd で常駐化可能。全テスト GREEN。
 

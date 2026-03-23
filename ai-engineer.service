@@ -1,0 +1,16 @@
+[Unit]
+Description=AI Engineering Team Orchestrator
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/user/ai-engineer
+EnvironmentFile=/home/user/ai-engineer/.env
+ExecStart=/usr/bin/node /home/user/ai-engineer/dist/src/index.js
+Restart=always
+RestartSec=30
+StandardOutput=append:/home/user/ai-engineer/logs/stdout.log
+StandardError=append:/home/user/ai-engineer/logs/stderr.log
+
+[Install]
+WantedBy=default.target

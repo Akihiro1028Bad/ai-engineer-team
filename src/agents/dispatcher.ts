@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { query } from "@anthropic-ai/claude-agent-sdk";
 import type { Task, AgentConfig } from "../types.js";
 
 interface ResultMessage {
@@ -32,8 +33,6 @@ export class Dispatcher {
     const cwd = join(this.worktreeDir, config.role);
 
     try {
-      const { query } = await import("@anthropic-ai/claude-agent-sdk");
-
       let resultMsg: ResultMessage | null = null;
 
       for await (const message of query({

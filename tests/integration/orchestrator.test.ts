@@ -72,8 +72,12 @@ describe("Orchestrator integration", () => {
     const orch = new Orchestrator(deps);
     await orch.tick();
 
-    // Wait for async dispatch
-    await new Promise((r) => setTimeout(r, 100));
+    // Wait for async fire-and-forget dispatch to settle
+    for (let i = 0; i < 20; i++) {
+      await new Promise((r) => setTimeout(r, 100));
+      const task = deps.queue.getById("test-001");
+      if (task?.status === "completed") break;
+    }
 
     const task = deps.queue.getById("test-001");
     expect(task?.status).toBe("completed");
