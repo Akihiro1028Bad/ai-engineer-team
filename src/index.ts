@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { execSync } from "node:child_process";
+import { join } from "node:path";
 
 import Database from "better-sqlite3";
 import { Octokit } from "@octokit/rest";
@@ -210,6 +211,7 @@ async function main(): Promise<void> {
   if (config.dashboardEnabled) {
     const dashboard = new DashboardServer(db, statusEmitter, {
       port: config.dashboardPort,
+      staticDir: join(import.meta.dirname ?? ".", "../dashboard/dist"),
     }, logger);
     dashboard.start();
     logger.info({ port: config.dashboardPort }, "Dashboard server enabled");

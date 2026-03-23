@@ -82,6 +82,14 @@ export class DashboardServer {
       }
     });
 
+    server.on("error", (err: NodeJS.ErrnoException) => {
+      if (err.code === "EADDRINUSE") {
+        this.logger.warn({ port: this.config.port }, "Dashboard port already in use — dashboard disabled");
+      } else {
+        this.logger.error({ error: err.message }, "Dashboard server error");
+      }
+    });
+
     server.listen(this.config.port, () => {
       this.logger.info({ port: this.config.port }, "Dashboard server started");
     });
