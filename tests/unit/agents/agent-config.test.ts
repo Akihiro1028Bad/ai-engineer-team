@@ -8,7 +8,8 @@ describe("getAgentConfig", () => {
     expect(config.allowedTools).toContain("Read");
     expect(config.permissionMode).toBe("acceptEdits");
     expect(config.maxTurns).toBe(50);
-    expect(config.maxBudgetUsd).toBe(1.0);
+    expect(config.maxBudgetUsd).toBe(5.0);
+    expect(config.model).toBe("opus");
     expect(config.systemPrompt).toContain("設計レビュアー");
     expect(config.systemPrompt).toContain("design.md");
     expect(config.systemPrompt).toContain("カバレッジ");

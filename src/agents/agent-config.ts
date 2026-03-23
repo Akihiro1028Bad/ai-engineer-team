@@ -59,9 +59,9 @@ const AGENT_CONFIGS = {
     allowedTools: ["Read", "Write", "Edit", "Glob", "Grep"],
     permissionMode: "acceptEdits" as const,
     maxTurns: 50,
-    maxBudgetUsd: 1.0,
-    timeoutMs: 600_000,
-    model: "sonnet" as const,
+    maxBudgetUsd: 5.0,
+    timeoutMs: 900_000,
+    model: "opus" as const,
     systemPrompt: REVIEWER_PROMPT,
   },
   fixer: {

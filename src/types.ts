@@ -152,6 +152,6 @@ export interface AgentConfig {
   readonly maxTurns: number;
   readonly maxBudgetUsd: number;
   readonly timeoutMs: number;
-  readonly model: "sonnet" | "haiku";
+  readonly model: "opus" | "sonnet" | "haiku";
   readonly systemPrompt: string;
 }
