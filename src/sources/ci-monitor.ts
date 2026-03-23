@@ -84,7 +84,7 @@ export class CIMonitor {
         });
         const sha = pr.head.sha;
 
-        // Check Runs を取得
+        // Check Runs を取得（GitHub Actions）
         const { data } = await this.octokit.checks.listForRef({
           owner: this.owner,
           repo: this.repo,
@@ -93,13 +93,40 @@ export class CIMonitor {
 
         if (data.check_runs.length === 0) continue; // CI 未開始
 
-        const allCompleted = data.check_runs.every((cr) => cr.status === "completed");
-        if (!allCompleted) continue; // まだ実行中
+        // まだ実行中のチェックがあればスキップ
+        const inProgress = data.check_runs.filter(
+          (cr) => cr.status === "queued" || cr.status === "in_progress",
+        );
+        if (inProgress.length > 0) {
+          this.logger.debug(
+            { taskId: task.id, inProgress: inProgress.map((cr) => cr.name) },
+            "CI still in progress",
+          );
+          continue;
+        }
 
-        const allSuccess = data.check_runs.every(
+        // Commit Statuses も確認（Vercel 等の外部 CI）
+        try {
+          const { data: combinedStatus } = await (this.octokit as unknown as {
+            repos: { getCombinedStatusForRef: (p: { owner: string; repo: string; ref: string }) => Promise<{ data: { state: string } }> };
+          }).repos.getCombinedStatusForRef({
+            owner: this.owner,
+            repo: this.repo,
+            ref: sha,
+          });
+          if (combinedStatus.state === "pending") {
+            this.logger.debug({ taskId: task.id }, "Combined status still pending");
+            continue;
+          }
+        } catch {
+          // Combined Status API がない場合は Check Runs のみで判定
+        }
+
+        const completedRuns = data.check_runs.filter((cr) => cr.status === "completed");
+        const allSuccess = completedRuns.every(
           (cr) => cr.conclusion === "success" || cr.conclusion === "neutral" || cr.conclusion === "skipped",
         );
-        const failedRuns = data.check_runs.filter((cr) => cr.conclusion === "failure");
+        const failedRuns = completedRuns.filter((cr) => cr.conclusion === "failure");
 
         if (allSuccess) {
           // ✅ CI 全パス
