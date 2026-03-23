@@ -23,6 +23,11 @@ interface OctokitLike {
       issue_number: number;
       body: string;
     }) => Promise<unknown>;
+    listComments: (params: {
+      owner: string;
+      repo: string;
+      issue_number: number;
+    }) => Promise<{ data: { body: string; user: { login: string } | null }[] }>;
   };
   pulls: {
     listReviews: (params: {
@@ -146,8 +151,41 @@ export class GitHubPoller {
           pull_number: prNumber,
         });
 
-        const approved = reviews.some((r) => r.state === "APPROVED");
-        if (approved) {
+        const approvedByReview = reviews.some((r) => r.state === "APPROVED");
+
+        // コメントによる承認も検出（自分の PR を自分で approve できないため）
+        let approvedByComment = false;
+        let rejectedByComment = false;
+        try {
+          const { data: comments } = await this.octokit.issues.listComments({
+            owner: this.owner,
+            repo: this.repo,
+            issue_number: prNumber,
+          });
+
+          const APPROVE_KEYWORDS = ["承認", "lgtm", "approve", "approved", "ok", "実装開始", "進めてください"];
+          const REJECT_KEYWORDS = ["却下", "reject", "やり直し", "修正してください"];
+          const botMarker = "🤖";
+
+          for (const comment of comments) {
+            // bot のコメントは無視
+            if (comment.body.includes(botMarker)) continue;
+
+            const lower = comment.body.toLowerCase().trim();
+            if (APPROVE_KEYWORDS.some((kw) => lower.includes(kw))) {
+              approvedByComment = true;
+            }
+            if (REJECT_KEYWORDS.some((kw) => lower.includes(kw))) {
+              rejectedByComment = true;
+            }
+          }
+        } catch {
+          // コメント取得失敗は非致命的
+        }
+
+        if (rejectedByComment) {
+          this.queue.rejectTask(task.id);
+        } else if (approvedByReview || approvedByComment) {
           this.queue.approveTask(task.id);
         }
       } catch {
