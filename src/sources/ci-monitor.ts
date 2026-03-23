@@ -141,18 +141,23 @@ export class CIMonitor {
     const fixingTasks = this.queue.getByStatus("ci_fixing");
 
     for (const task of fixingTasks) {
-      // この親タスクに紐づく cifix タスクを探す
-      for (let attempt = 1; attempt <= MAX_CI_FIX_ATTEMPTS; attempt++) {
-        const fixTaskId = `${task.id}-cifix-${attempt}`;
-        const fixTask = this.queue.getById(fixTaskId);
+      // 最新の cifix タスクを探す（ci_fix_count が現在の試行番号）
+      const fixTaskId = `${task.id}-cifix-${task.ciFixCount}`;
+      const fixTask = this.queue.getById(fixTaskId);
 
-        if (fixTask && (fixTask.status === "completed" || fixTask.status === "failed")) {
-          // 修正タスクが完了/失敗 → ci_checking に戻して CI を再確認（pr_number を保持）
-          this.queue.updateStatus(task.id, "ci_checking", { prNumber: task.prNumber ?? undefined });
-          this.logger.info({ taskId: task.id, fixTaskId }, "CI fix task done, returning to ci_checking");
-          break;
-        }
+      if (!fixTask) continue;
+
+      // まだ実行中/待機中 → 何もしない（待機）
+      if (fixTask.status === "pending" || fixTask.status === "in_progress") {
+        continue;
       }
+
+      // 完了 or 失敗 → ci_checking に戻して CI を再確認
+      this.queue.updateStatus(task.id, "ci_checking", { prNumber: task.prNumber ?? undefined });
+      this.logger.info(
+        { taskId: task.id, fixTaskId, fixResult: fixTask.status },
+        "CI fix task done, returning to ci_checking",
+      );
     }
   }
 
@@ -202,6 +207,19 @@ export class CIMonitor {
 
     if (this.queue.isDuplicate(source)) return;
 
+    // PR のブランチ名を取得
+    let prBranch = "";
+    try {
+      const { data: pr } = await this.octokit.pulls.get({
+        owner: this.owner,
+        repo: this.repo,
+        pull_number: prNumber,
+      }) as { data: { head: { ref: string; sha: string } } };
+      prBranch = pr.head.ref;
+    } catch {
+      // ブランチ名取得失敗時は空文字のまま（Dispatcher が通常のブランチを作成する）
+    }
+
     this.queue.push({
       id: fixTaskId,
       taskType: "fix",
@@ -209,16 +227,18 @@ export class CIMonitor {
       description: [
         `PR #${prNumber} の CI が失敗しました。以下のエラーを修正してください。`,
         "",
+        prBranch ? `**既存ブランチ**: \`${prBranch}\`（このブランチ上で修正してください）` : "",
+        "",
         "## CI 失敗ログ",
         failureLogs,
         "",
         "## 指示",
         "1. エラーの原因を特定してください",
         "2. コードを修正してください",
-        "3. 修正はこのブランチ上で行ってください（新しいブランチは作らないでください）",
+        "3. 修正は既存のブランチ上で行い、新しいブランチは作らないでください",
       ].join("\n"),
       source,
-      priority: 1, // 最優先
+      priority: 1,
       dependsOn: null,
       parentTaskId: null,
     });
