@@ -323,7 +323,8 @@ export class GitHubPoller {
           const allComments = [...issueComments, ...reviewComments];
 
           const botMarker = "🤖";
-          const humanComments: string[] = [];
+          let latestApproveReject: "approve" | "reject" | null = null;
+          let latestFeedback = "";
 
           for (const comment of allComments) {
             // bot / GitHub App のコメントは無視
@@ -337,18 +338,24 @@ export class GitHubPoller {
             const BOT_LOGINS = ["vercel", "github-actions", "dependabot", "renovate"];
             if (login.includes("bot") || login.includes("[bot]") || BOT_LOGINS.includes(login)) continue;
 
-            humanComments.push(comment.body.trim());
+            const body = comment.body.trim();
+            if (body === "承認") {
+              latestApproveReject = "approve";
+            } else if (body === "却下") {
+              latestApproveReject = "reject";
+            } else if (body.length > 0) {
+              latestFeedback = body;
+            }
           }
 
-          // 最後の人間コメントで判定
-          const lastComment = humanComments.length > 0 ? humanComments[humanComments.length - 1]! : "";
-          if (lastComment === "承認") {
+          // 「承認」「却下」は他のコメントより優先（最後に出現したもの）
+          if (latestApproveReject === "approve") {
             lastHumanAction = "approve";
-          } else if (lastComment === "却下") {
+          } else if (latestApproveReject === "reject") {
             lastHumanAction = "reject";
-          } else if (lastComment.length > 0) {
+          } else if (latestFeedback.length > 0) {
             lastHumanAction = "feedback";
-            lastFeedbackComment = lastComment;
+            lastFeedbackComment = latestFeedback;
           }
         } catch {
           // コメント取得失敗は非致命的
