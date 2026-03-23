@@ -67,6 +67,9 @@ export class CIMonitor {
   ) {}
 
   async checkPendingPRs(): Promise<void> {
+    // ci_fixing のタスクで修正タスクが完了/失敗していれば ci_checking に戻す
+    await this.checkFixingTasks();
+
     const tasks = this.queue.getByStatus("ci_checking");
 
     for (const task of tasks) {
@@ -130,6 +133,25 @@ export class CIMonitor {
         }
       } catch (error: unknown) {
         this.logger.error({ taskId: task.id, error }, "CI check error");
+      }
+    }
+  }
+
+  private async checkFixingTasks(): Promise<void> {
+    const fixingTasks = this.queue.getByStatus("ci_fixing");
+
+    for (const task of fixingTasks) {
+      // この親タスクに紐づく cifix タスクを探す
+      for (let attempt = 1; attempt <= MAX_CI_FIX_ATTEMPTS; attempt++) {
+        const fixTaskId = `${task.id}-cifix-${attempt}`;
+        const fixTask = this.queue.getById(fixTaskId);
+
+        if (fixTask && (fixTask.status === "completed" || fixTask.status === "failed")) {
+          // 修正タスクが完了/失敗 → ci_checking に戻して CI を再確認（pr_number を保持）
+          this.queue.updateStatus(task.id, "ci_checking", { prNumber: task.prNumber ?? undefined });
+          this.logger.info({ taskId: task.id, fixTaskId }, "CI fix task done, returning to ci_checking");
+          break;
+        }
       }
     }
   }
