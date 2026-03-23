@@ -33,6 +33,10 @@ import { GeneratorCriticLoop } from "./quality/generator-critic-loop.js";
 import { AgentRunner } from "./execution/agent-runner.js";
 import { DashboardServer } from "./dashboard/server.js";
 import { SkillRegistry } from "./toolforge/skill-registry.js";
+import { GapDetector } from "./toolforge/gap-detector.js";
+import { ToolSynthesizer } from "./toolforge/tool-synthesizer.js";
+import { SandboxValidator } from "./toolforge/sandbox-validator.js";
+import { PerAgentCircuitBreaker } from "./safety/per-agent-circuit-breaker.js";
 import { Orchestrator } from "./orchestrator.js";
 import type { RepoConfig } from "./types.js";
 
@@ -83,6 +87,19 @@ async function main(): Promise<void> {
   const feedbackLearner = new PRFeedbackLearner(db, logger);
   const validationGate = new ValidationGate(logger);
   const skillRegistry = new SkillRegistry("skills", logger);
+  const gapDetector = new GapDetector(db, logger);
+  const toolSynthesizer = new ToolSynthesizer("skills", logger);
+  const sandboxValidator = new SandboxValidator(logger);
+  const perAgentCB = new PerAgentCircuitBreaker(logger, (key) => {
+    void slackNotifier.send({
+      level: "error",
+      event: "per_agent_cb_open",
+      title: `Per-Agent Circuit Breaker OPEN: ${key}`,
+      body: `Agent ${key} paused due to consecutive failures.`,
+      fields: { key },
+      timestamp: new Date().toISOString(),
+    });
+  });
 
   // マルチリポジトリ設定の読み込み
   const repos = loadReposConfig(config.reposJsonPath, {
@@ -109,7 +126,7 @@ async function main(): Promise<void> {
     );
 
     const githubPoller = new GitHubPoller(
-      octokit as never, queue, owner, repo, dispatcher,
+      octokit as never, queue, owner, repo, dispatcher, logger,
     );
 
     const resultCollector = new ResultCollector(
@@ -166,6 +183,7 @@ async function main(): Promise<void> {
     primary.worktreeManager,
     statusEmitter,
     logger,
+    handoffStore,
   );
   const criticLoop = new GeneratorCriticLoop(agentRunner, statusEmitter, logger);
 
@@ -205,6 +223,11 @@ async function main(): Promise<void> {
     criticLoop,
     dryRunDefault: config.dryRunDefault,
     enableV3Planning: true,
+    perAgentCircuitBreaker: perAgentCB,
+    gapDetector,
+    toolSynthesizer,
+    sandboxValidator,
+    toolforgeEnabled: config.toolforgeEnabled,
   });
 
   // Dashboard サーバー

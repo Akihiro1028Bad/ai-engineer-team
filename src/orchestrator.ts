@@ -21,6 +21,10 @@ import type { PRFeedbackLearner } from "./feedback/pr-feedback-learner.js";
 import type { ValidationGate } from "./quality/validation-gate.js";
 import type { GeneratorCriticLoop } from "./quality/generator-critic-loop.js";
 import type { SkillRegistry } from "./toolforge/skill-registry.js";
+import type { GapDetector } from "./toolforge/gap-detector.js";
+import type { ToolSynthesizer } from "./toolforge/tool-synthesizer.js";
+import type { SandboxValidator } from "./toolforge/sandbox-validator.js";
+import type { PerAgentCircuitBreaker } from "./safety/per-agent-circuit-breaker.js";
 import { AnalyzerAgent } from "./planning/analyzer-agent.js";
 import { PlannerAgent } from "./planning/planner-agent.js";
 import { DAGScheduler } from "./planning/dag-scheduler.js";
@@ -69,6 +73,13 @@ export interface OrchestratorDeps {
   dryRunDefault?: boolean;
   /** v3.0 Planning レイヤーを有効化するか（false: v2.1 互換モード） */
   enableV3Planning?: boolean;
+  // Per-Agent Circuit Breaker
+  perAgentCircuitBreaker?: PerAgentCircuitBreaker;
+  // ToolForge
+  gapDetector?: GapDetector;
+  toolSynthesizer?: ToolSynthesizer;
+  sandboxValidator?: SandboxValidator;
+  toolforgeEnabled?: boolean;
 }
 
 /** Pattern Memory 更新間隔（100 タスク実行ごと） */
@@ -217,6 +228,50 @@ export class Orchestrator {
       }
 
       if (maxConcurrent === 1) break;
+    }
+
+    // ToolForge: 失敗パターンからツールギャップを検出（低頻度）
+    if (this.deps.toolforgeEnabled && this.deps.gapDetector && this.tickCount % 100 === 0) {
+      try {
+        const gaps = this.deps.gapDetector.detectFromFailures();
+        if (gaps.length > 0 && this.deps.toolSynthesizer && this.deps.sandboxValidator && this.deps.skillRegistry) {
+          for (const gap of gaps.slice(0, 1)) { // 一度に1つだけ生成
+            logger.info({ gap: gap.suggestedToolName }, "ToolForge: generating skill for gap");
+            const tool = await this.deps.toolSynthesizer.synthesize(gap);
+            if (tool) {
+              const toolDir = this.deps.toolSynthesizer.writeToDisk(tool);
+              const validation = this.deps.sandboxValidator.validate(toolDir);
+              if (validation.passed) {
+                this.deps.skillRegistry.register({
+                  name: tool.name,
+                  description: tool.description,
+                  version: 1,
+                  createdBy: "toolforge",
+                  safetyLevel: tool.safetyLevel,
+                  usageCount: 0,
+                  successRate: 0,
+                  approvalStatus: tool.safetyLevel === "read_only" ? "approved" : "pending_review",
+                  tags: [gap.category],
+                  createdAt: new Date().toISOString(),
+                });
+                logger.info({ tool: tool.name }, "ToolForge: skill registered");
+              } else {
+                logger.warn({ tool: tool.name, checks: validation.checks.filter((c) => !c.passed) }, "ToolForge: skill validation failed");
+              }
+            }
+          }
+        }
+      } catch (error: unknown) {
+        logger.warn({ error }, "ToolForge check failed");
+      }
+    }
+
+    // Skill Registry evolution（低頻度）
+    if (this.deps.skillRegistry && this.tickCount % 500 === 0) {
+      const { promoted, deprecated } = this.deps.skillRegistry.evolve();
+      if (promoted.length > 0 || deprecated.length > 0) {
+        logger.info({ promoted, deprecated }, "Skill lifecycle evolution");
+      }
     }
   }
 

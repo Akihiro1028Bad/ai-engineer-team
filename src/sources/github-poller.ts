@@ -1,7 +1,12 @@
-import { Classifier } from "../agents/classifier.js";
+import { ClassifierV3 } from "../intake/classifier.js";
+import type { ClassificationResult } from "../intake/classifier.js";
+import { IssueDiscussion } from "../intake/issue-discussion.js";
+import { AutoTriage } from "../intake/auto-triage.js";
+import { RelatedIssueDetector } from "../intake/related-issues.js";
 import type { TaskQueue } from "../queue/task-queue.js";
 import type { Dispatcher } from "../agents/dispatcher.js";
 import { getAgentConfig } from "../agents/agent-config.js";
+import type pino from "pino";
 
 interface GitHubIssue {
   number: number;
@@ -29,7 +34,13 @@ interface OctokitLike {
       owner: string;
       repo: string;
       issue_number: number;
-    }) => Promise<{ data: { body: string; user: { login: string } | null }[] }>;
+    }) => Promise<{ data: { body: string; user: { login: string } | null; created_at: string }[] }>;
+    addLabels: (params: {
+      owner: string;
+      repo: string;
+      issue_number: number;
+      labels: string[];
+    }) => Promise<unknown>;
   };
   pulls: {
     listReviews: (params: {
@@ -60,7 +71,7 @@ interface OctokitLike {
 
 function isBot(comment: { body: string; user: { login: string } | null }): boolean {
   const login = comment.user?.login?.toLowerCase() ?? "";
-  if (!login) return true; // null user = GitHub App
+  if (!login) return true;
   const BOT_LOGINS = ["vercel", "github-actions", "dependabot", "renovate"];
   if (login.includes("bot") || login.includes("[bot]") || BOT_LOGINS.includes(login)) return true;
   if (comment.body.includes("🤖")) return true;
@@ -71,7 +82,10 @@ function isBot(comment: { body: string; user: { login: string } | null }): boole
 }
 
 export class GitHubPoller {
-  private readonly classifier: Classifier;
+  private readonly classifierV3: ClassifierV3;
+  private readonly issueDiscussion: IssueDiscussion;
+  private readonly autoTriage: AutoTriage;
+  private readonly relatedIssues: RelatedIssueDetector;
 
   constructor(
     private readonly octokit: OctokitLike,
@@ -79,8 +93,13 @@ export class GitHubPoller {
     private readonly owner: string,
     private readonly repo: string,
     private readonly dispatcher?: Dispatcher,
+    private readonly logger?: pino.Logger,
   ) {
-    this.classifier = new Classifier(octokit, owner, repo);
+    this.classifierV3 = new ClassifierV3(octokit, owner, repo);
+    const log = logger ?? { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} } as unknown as pino.Logger;
+    this.issueDiscussion = new IssueDiscussion(octokit, owner, repo, log);
+    this.autoTriage = new AutoTriage(octokit, owner, repo, log);
+    this.relatedIssues = new RelatedIssueDetector(octokit, owner, repo, log);
   }
 
   /** Issue にリアクション（スタンプ）を付ける */
@@ -108,54 +127,131 @@ export class GitHubPoller {
     } catch { /* non-critical */ }
   }
 
-  /** 全 open Issue をポーリングし、未処理の Issue をタスクキューに投入する */
+  /**
+   * 全 open Issue をポーリングし、未処理の Issue をタスクキューに投入する。
+   * v3.0: ClassifierV3 + Issue Discussion + Auto-Triage + Related Issues
+   */
   async pollIssues(): Promise<void> {
     try {
       const { data: issues } = await this.octokit.issues.listForRepo({
         owner: this.owner, repo: this.repo, state: "open",
       });
 
+      // 待機中のディスカッションをチェック
+      for (const discussion of this.issueDiscussion.getPendingDiscussions()) {
+        const state = await this.issueDiscussion.checkForAnswers(discussion.issueNumber);
+        if (state?.status === "answered") {
+          // 回答があった → 再分類
+          const issue = issues.find((i) => i.number === state.issueNumber);
+          if (issue) {
+            const body = `${issue.body ?? ""}\n\n## 追加情報（質問への回答）\n${state.answers.join("\n")}`;
+            await this.processIssue({
+              ...issue,
+              body,
+              labels: issue.labels,
+            });
+            this.issueDiscussion.resolve(state.issueNumber);
+          }
+        }
+      }
+
+      // 新規 Issue を処理
       for (const issue of issues) {
         if ("pull_request" in issue) continue;
 
         const source = `github_issue:${issue.number}`;
         if (this.queue.isDuplicate(source)) continue;
 
-        const labels = issue.labels.map((l) => l.name);
-        const result = await this.classifier.classify({
-          number: issue.number, title: issue.title, body: issue.body ?? "", labels,
-        });
+        // ディスカッション中の Issue はスキップ
+        const discussionState = this.issueDiscussion.getState(issue.number);
+        if (discussionState && discussionState.status === "waiting_answer") continue;
 
-        // 👀 Issue 検出リアクション
-        try {
-          await this.octokit.reactions.createForIssue({
-            owner: this.owner, repo: this.repo, issue_number: issue.number, content: "eyes",
-          });
-        } catch { /* non-critical */ }
-
-        for (const { scopeId, classification } of result.pipelines) {
-          if (classification.complexity !== "pipeline") continue;
-
-          const prefix = result.pipelines.length > 1
-            ? `gh-${issue.number}-${scopeId}`
-            : `gh-${issue.number}`;
-
-          const tasks = classification.subTasks.map((sub, i) => ({
-            id: `${prefix}-${i}`,
-            taskType: sub.taskType,
-            title: sub.title,
-            description: sub.description,
-            source: i === 0 ? source : `${source}:${scopeId}:${i}`,
-            priority: 5,
-            dependsOn: sub.dependsOnIndex !== null ? `${prefix}-${sub.dependsOnIndex}` : null,
-            parentTaskId: `${prefix}-0`,
-          }));
-          this.queue.pushPipeline(tasks);
-        }
+        await this.processIssue(issue);
       }
     } catch {
       // GitHub API エラーはログのみ
     }
+  }
+
+  /** 個別 Issue を処理する（分類→トリアージ→関連検出→キュー投入） */
+  private async processIssue(issue: GitHubIssue): Promise<void> {
+    const source = `github_issue:${issue.number}`;
+    const labels = issue.labels.map((l) => l.name);
+
+    // v3.0 ClassifierV3 で分類
+    const result = await this.classifierV3.classify({
+      number: issue.number, title: issue.title, body: issue.body ?? "", labels,
+    });
+
+    // 👀 Issue 検出リアクション
+    try {
+      await this.octokit.reactions.createForIssue({
+        owner: this.owner, repo: this.repo, issue_number: issue.number, content: "eyes",
+      });
+    } catch { /* non-critical */ }
+
+    // unclear → Issue Discussion（質問を投稿）
+    if (this.hasUnclearClassification(result)) {
+      const question = this.extractQuestion(result);
+      if (question) {
+        await this.issueDiscussion.askClarification(issue.number, [question]);
+        return;
+      }
+    }
+
+    // Auto-Triage（ラベル・優先度・サイズ）
+    const triage = result.triage
+      ? await this.autoTriage.triage(
+          issue.number,
+          labels,
+          result.triage.suggestedLabels,
+          result.triage.estimatedSize,
+          result.triage.taskType,
+        )
+      : { priority: 5, appliedLabels: [], estimatedSize: "M", issueNumber: issue.number };
+
+    // Related Issues 検出（非同期、タスク処理をブロックしない）
+    void this.relatedIssues.findRelated(issue.number, issue.title, issue.body ?? "").then((related) => {
+      if (related.length > 0) {
+        void this.relatedIssues.postRelatedComment(issue.number, related);
+      }
+    });
+
+    // タスクキューに投入
+    for (const { scopeId, classification } of result.pipelines) {
+      if (classification.complexity !== "pipeline") continue;
+
+      const prefix = result.pipelines.length > 1
+        ? `gh-${issue.number}-${scopeId}`
+        : `gh-${issue.number}`;
+
+      const tasks = classification.subTasks.map((sub, i) => ({
+        id: `${prefix}-${i}`,
+        taskType: sub.taskType,
+        title: sub.title,
+        description: sub.description,
+        source: i === 0 ? source : `${source}:${scopeId}:${i}`,
+        priority: triage.priority,
+        dependsOn: sub.dependsOnIndex !== null ? `${prefix}-${sub.dependsOnIndex}` : null,
+        parentTaskId: `${prefix}-0`,
+      }));
+      this.queue.pushPipeline(tasks);
+    }
+  }
+
+  /** 分類結果に unclear が含まれるかチェック */
+  private hasUnclearClassification(result: ClassificationResult): boolean {
+    return result.pipelines.some((p) => p.classification.complexity === "unclear");
+  }
+
+  /** unclear 分類から質問を抽出 */
+  private extractQuestion(result: ClassificationResult): string | null {
+    for (const p of result.pipelines) {
+      if (p.classification.complexity === "unclear") {
+        return p.classification.question;
+      }
+    }
+    return null;
   }
 
   /**
@@ -204,7 +300,6 @@ export class GitHubPoller {
         } else if (action.type === "reject") {
           this.queue.rejectTask(task.id);
         } else if (action.type === "feedback" && action.comment) {
-          // フィードバック → 直接 Dispatcher で design.md を修正（タスクキューを介さない）
           await this.handleFeedbackDirectly(task.id, prNumber, pr.head.ref, action.comment);
         }
       } catch {
@@ -232,7 +327,6 @@ export class GitHubPoller {
 
       const allComments = [...issueComments, ...reviewComments];
 
-      // 承認/却下は最優先で検出（全コメントをスキャン）
       let hasApprove = false;
       let hasReject = false;
       let latestFeedback = "";
@@ -250,11 +344,9 @@ export class GitHubPoller {
         }
       }
 
-      // 承認/却下が優先（どちらもあれば承認が勝つ）
       if (hasApprove) return { type: "approve" };
       if (hasReject) return { type: "reject" };
 
-      // フィードバックがある場合（既に処理済みでないか確認）
       if (latestFeedback) {
         const feedbackKey = `feedback:${prNumber}:${latestFeedback.slice(0, 50)}`;
         if (!this.queue.isDuplicate(feedbackKey)) {
@@ -277,7 +369,6 @@ export class GitHubPoller {
   ): Promise<void> {
     if (!this.dispatcher) return;
 
-    // フィードバック処理済みフラグを記録
     const feedbackKey = `feedback:${prNumber}:${feedback.slice(0, 50)}`;
     const markerId = `${taskId}-fb-${Date.now()}`;
     this.queue.push({
@@ -290,7 +381,6 @@ export class GitHubPoller {
       dependsOn: null,
       parentTaskId: null,
     });
-    // マーカータスクを即座に完了（同一 ID を使用）
     this.queue.updateStatus(markerId, "completed");
 
     // 👀 リアクション
@@ -341,7 +431,6 @@ export class GitHubPoller {
     const result = await this.dispatcher.dispatch(feedbackTask, config, prBranch);
 
     if (result.pushed) {
-      // PR にコメント + @claude /review
       try {
         await this.octokit.issues.createComment({
           owner: this.owner, repo: this.repo, issue_number: prNumber,
@@ -353,7 +442,6 @@ export class GitHubPoller {
         });
       } catch { /* non-critical */ }
     } else {
-      // 修正失敗 → PR にコメント
       try {
         await this.octokit.issues.createComment({
           owner: this.owner, repo: this.repo, issue_number: prNumber,

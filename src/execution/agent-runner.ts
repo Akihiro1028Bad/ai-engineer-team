@@ -2,9 +2,11 @@ import type pino from "pino";
 
 import type { AgentConfigV3, AgentRoleV3 } from "../types.js";
 import type { PlanNode } from "../types/execution-plan.js";
+import type { HandoffReport } from "../types/handoff-report.js";
 import type { WorktreeManager } from "../agents/worktree-manager.js";
 import { getAgentConfigV3 } from "../agents/agent-config.js";
 import type { StatusEmitter } from "./status-emitter.js";
+import type { HandoffStore } from "./handoff-store.js";
 
 interface ResultMessage {
   type: "result";
@@ -55,6 +57,7 @@ export class AgentRunner {
     private readonly worktreeManager: WorktreeManager,
     private readonly statusEmitter: StatusEmitter,
     private readonly logger: pino.Logger,
+    private readonly handoffStore?: HandoffStore,
   ) {}
 
   async run(options: RunOptions): Promise<NodeRunResult> {
@@ -92,6 +95,11 @@ export class AgentRunner {
             commitMessage,
           );
           result.pushed = pushed;
+        }
+
+        // Handoff Report 自動生成・保存
+        if (this.handoffStore && node.dependsOn.length > 0) {
+          this.saveHandoffReport(planId, node, result);
         }
 
         this.statusEmitter.emitNodeCompleted(taskId, planId, node.id, node.agentRole, {
@@ -204,5 +212,36 @@ export class AgentRunner {
   /** コミットが必要なエージェントロールかどうか */
   private shouldCommit(role: AgentRoleV3): boolean {
     return ["designer", "implementer", "scribe", "reviewer", "fixer", "builder"].includes(role);
+  }
+
+  /** Handoff Report を自動生成して保存する */
+  private saveHandoffReport(planId: string, node: PlanNode, result: NodeRunResult): void {
+    if (!this.handoffStore) return;
+
+    // 後続ノードは dependsOn で定義されていないため、
+    // 現ノードから次のノードへの引き継ぎとして "self → dependants" の形で保存
+    const report: HandoffReport = {
+      id: `handoff-${planId}-${node.id}-${Date.now()}`,
+      planId,
+      fromNodeId: node.id,
+      toNodeId: "next", // 後続ノードが実行時に取得する
+      fromAgent: node.agentRole,
+      toAgent: node.agentRole, // 後続ノードの role は不明なので同一で placeholder
+      summary: result.result
+        ? result.result.slice(0, 500)
+        : `${node.agentRole} completed node ${node.id}`,
+      decisions: [],
+      artifacts: result.pushed
+        ? [{ type: "file", content: "Changes committed and pushed" }]
+        : [],
+      warnings: result.error ? [result.error] : [],
+      timestamp: new Date().toISOString(),
+    };
+
+    try {
+      this.handoffStore.save(report);
+    } catch {
+      this.logger.warn({ planId, nodeId: node.id }, "Failed to save handoff report");
+    }
   }
 }
