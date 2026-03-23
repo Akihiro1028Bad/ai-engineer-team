@@ -321,7 +321,7 @@ export class GitHubPoller {
 
           const allComments = [...issueComments, ...reviewComments];
 
-          const APPROVE_KEYWORDS = ["承認", "lgtm", "approve", "approved", "ok", "実装開始", "進めてください"];
+          const APPROVE_KEYWORDS = ["承認", "lgtm", "approve", "approved", "ok", "実装開始", "進めてください", "大丈夫", "問題ない", "いいと思います", "良いと思います", "お願いします", "進めて"];
           const REJECT_KEYWORDS = ["却下", "reject", "やり直し", "修正してください"];
           const botMarker = "🤖";
 
