@@ -120,9 +120,14 @@ export class Orchestrator {
     if (!task) return;
 
     // Fixer/Builder は Reviewer と同じブランチを使う
+    // フィードバック修正タスクも元の PR ブランチを使う
     let existingBranch: string | undefined;
     if (task.taskType !== "review" && task.dependsOn) {
       existingBranch = `agent/reviewer/${task.dependsOn}`;
+    } else if (taskId.includes("-feedback-")) {
+      // gh-31-0-feedback-* → 元タスクは gh-31-0 → ブランチは agent/reviewer/gh-31-0
+      const baseTaskId = taskId.split("-feedback-")[0]!;
+      existingBranch = `agent/reviewer/${baseTaskId}`;
     }
 
     const result = await dispatcher.dispatch(task, config, existingBranch);
