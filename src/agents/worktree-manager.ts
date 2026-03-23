@@ -14,17 +14,34 @@ export class WorktreeManager {
     const worktreePath = join(this.worktreeDir, role);
     const branch = `agent/${role}/${taskId}`;
 
+    // 1. リモートの最新 main を取得
     try {
-      // Create branch and checkout in worktree
+      this.exec(`git -C ${this.projectDir} fetch origin main`);
+    } catch {
+      // fetch 失敗はネットワーク障害等 — 続行（ローカル main で作業）
+    }
+
+    // 2. worktree が存在しなければ作成
+    try {
       this.exec(
-        `git -C ${this.projectDir} worktree add -B ${branch} ${worktreePath} HEAD 2>/dev/null || git -C ${worktreePath} checkout -B ${branch}`,
+        `git -C ${this.projectDir} worktree add ${worktreePath} main 2>/dev/null || true`,
       );
     } catch {
-      // Worktree may already exist; try switching branch
+      // 既に存在する場合は無視
+    }
+
+    // 3. worktree を最新の main に同期してからブランチ作成
+    try {
+      this.exec(`git -C ${worktreePath} checkout main 2>/dev/null || true`);
+      this.exec(`git -C ${worktreePath} reset --hard origin/main`);
+      this.exec(`git -C ${worktreePath} clean -fd`);
+      this.exec(`git -C ${worktreePath} checkout -B ${branch}`);
+    } catch {
+      // フォールバック: 直接ブランチ作成
       try {
         this.exec(`git -C ${worktreePath} checkout -B ${branch}`);
       } catch {
-        // Log and continue
+        // 最終手段: 既存のままで続行
       }
     }
 
