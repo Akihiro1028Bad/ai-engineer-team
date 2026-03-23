@@ -2,8 +2,18 @@ import { z } from "zod";
 
 // === Task Types ===
 
+/** v2.1 互換: 既存コードが依存するタスクタイプ */
 export const TaskTypeSchema = z.enum(["review", "fix", "build", "document"]);
 export type TaskType = z.infer<typeof TaskTypeSchema>;
+
+/** v3.0: DAG ノード用の拡張タスクタイプ */
+export const TaskTypeV3Schema = z.enum([
+  // v2.1 互換
+  "review", "fix", "build", "document",
+  // v3.0 新規
+  "analyze", "design", "implement", "critique",
+]);
+export type TaskTypeV3 = z.infer<typeof TaskTypeV3Schema>;
 
 export const TaskStatusSchema = z.enum([
   "pending",
@@ -15,11 +25,26 @@ export const TaskStatusSchema = z.enum([
   "ci_passed",
   "ci_fixing",
   "ci_failed",
+  // v3.0 新規
+  "planning",
+  "validating",
 ]);
 export type TaskStatus = z.infer<typeof TaskStatusSchema>;
 
+/** v2.1 互換: 既存の4エージェント */
 export const AgentRoleSchema = z.enum(["reviewer", "fixer", "builder", "scribe"]);
 export type AgentRole = z.infer<typeof AgentRoleSchema>;
+
+/** v3.0: 5コアエージェント + 補助エージェント */
+export const AgentRoleV3Schema = z.enum([
+  // コアエージェント
+  "analyzer", "designer", "implementer", "critic", "scribe",
+  // 補助エージェント
+  "classifier", "optimizer", "tool_synthesizer",
+  // v2.1 互換エイリアス
+  "reviewer", "fixer", "builder",
+]);
+export type AgentRoleV3 = z.infer<typeof AgentRoleV3Schema>;
 
 // === CreateTaskInput ===
 
@@ -155,3 +180,62 @@ export interface AgentConfig {
   readonly model: "opus" | "sonnet" | "haiku";
   readonly systemPrompt: string;
 }
+
+/** v3.0: 拡張 AgentConfig（role が V3 ロールに対応） */
+export interface AgentConfigV3 {
+  readonly role: AgentRoleV3;
+  readonly allowedTools: readonly string[];
+  readonly permissionMode: "dontAsk" | "acceptEdits";
+  readonly maxTurns: number;
+  readonly maxBudgetUsd: number;
+  readonly timeoutMs: number;
+  readonly model: "opus" | "sonnet" | "haiku";
+  readonly systemPrompt: string;
+}
+
+// === Multi-Repository Config ===
+
+export const RepoConfigSchema = z.object({
+  id: z.string().min(1),
+  githubRepo: z.string().regex(/^[^/]+\/[^/]+$/),
+  projectDir: z.string().min(1),
+  worktreeDir: z.string().min(1),
+  enabled: z.boolean().default(true),
+  dailyBudgetUsd: z.number().nonnegative().optional(),
+  maxConcurrent: z.number().int().positive().default(1),
+});
+export type RepoConfig = z.infer<typeof RepoConfigSchema>;
+
+// === Re-exports (v3.0 types) ===
+
+export type {
+  ExecutionPlan,
+  PlanNode,
+  RiskLevel,
+  ExecutionPlanStatus,
+  NodeExecutionState,
+  NodeExecutionRecord,
+  AnalysisReport,
+} from "./types/execution-plan.js";
+
+export type {
+  ValidationResult,
+  ValidationCheck,
+  ValidationSeverity,
+  CriticReview,
+  CriticFinding,
+} from "./types/validation.js";
+
+export type {
+  EvalRecord,
+  PatternMemory,
+  FailurePattern,
+  CostEstimate,
+  FeedbackLearning,
+  FailureCategory,
+} from "./types/eval.js";
+
+export type {
+  HandoffReport,
+  HandoffDecision,
+} from "./types/handoff-report.js";

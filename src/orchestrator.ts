@@ -121,7 +121,12 @@ export class Orchestrator {
     // Fixer/Builder は Reviewer と同じブランチを使う
     let existingBranch: string | undefined;
     if (task.taskType !== "review" && task.dependsOn) {
-      existingBranch = `agent/reviewer/${task.dependsOn}`;
+      // 依存先タスクの role を動的に解決（"reviewer" ハードコード回避）
+      const dependsOnTask = queue.getById(task.dependsOn);
+      const depRole = dependsOnTask
+        ? taskTypeToRole(dependsOnTask.taskType as TaskType)
+        : "reviewer"; // フォールバック: 依存先が見つからない場合
+      existingBranch = `agent/${depRole}/${task.dependsOn}`;
     }
 
     const result = await dispatcher.dispatch(task, config, existingBranch);

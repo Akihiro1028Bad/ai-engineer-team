@@ -279,8 +279,9 @@ export class GitHubPoller {
 
     // フィードバック処理済みフラグを記録
     const feedbackKey = `feedback:${prNumber}:${feedback.slice(0, 50)}`;
+    const markerId = `${taskId}-fb-${Date.now()}`;
     this.queue.push({
-      id: `${taskId}-fb-${Date.now()}`,
+      id: markerId,
       taskType: "review",
       title: `[feedback-marker] PR #${prNumber}`,
       description: "フィードバック処理済みマーカー（実行不要）",
@@ -289,8 +290,8 @@ export class GitHubPoller {
       dependsOn: null,
       parentTaskId: null,
     });
-    // マーカータスクを即座に完了
-    this.queue.updateStatus(`${taskId}-fb-${Date.now()}`, "completed");
+    // マーカータスクを即座に完了（同一 ID を使用）
+    this.queue.updateStatus(markerId, "completed");
 
     // 👀 リアクション
     try {

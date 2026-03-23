@@ -14,6 +14,13 @@ const EnvSchema = z
     slackWebhookUrl: z.string().url().optional(),
     dailyBudgetUsd: z.number().min(0).optional(),
     maxConcurrent: z.number().int().min(1).default(1),
+    // v3.0 新規
+    reposJsonPath: z.string().optional(),
+    dashboardEnabled: z.boolean().default(false),
+    dashboardPort: z.number().int().min(1024).max(65535).default(3100),
+    toolforgeEnabled: z.boolean().default(false),
+    dryRunDefault: z.boolean().default(false),
+    explorationRate: z.number().min(0).max(1).default(0.1),
   })
   .refine(
     (data) => !(data.anthropicApiKey && data.rateControlEnabled),
@@ -48,6 +55,13 @@ export function loadConfig(): LoadResult {
     slackWebhookUrl: env["SLACK_WEBHOOK_URL"] || undefined,
     dailyBudgetUsd: env["DAILY_BUDGET_USD"] ? Number(env["DAILY_BUDGET_USD"]) : undefined,
     maxConcurrent: env["MAX_CONCURRENT"] ? Number(env["MAX_CONCURRENT"]) : undefined,
+    // v3.0 新規
+    reposJsonPath: env["REPOS_JSON_PATH"] || undefined,
+    dashboardEnabled: env["DASHBOARD_ENABLED"] === "true",
+    dashboardPort: env["DASHBOARD_PORT"] ? Number(env["DASHBOARD_PORT"]) : undefined,
+    toolforgeEnabled: env["TOOLFORGE_ENABLED"] === "true",
+    dryRunDefault: env["DRY_RUN_DEFAULT"] === "true",
+    explorationRate: env["EXPLORATION_RATE"] ? Number(env["EXPLORATION_RATE"]) : undefined,
   };
 
   const result = EnvSchema.safeParse(raw);

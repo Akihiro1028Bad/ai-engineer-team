@@ -129,12 +129,23 @@ export class Dispatcher {
       }
 
       if (resultMsg.subtype === "success") {
-        // Reviewer の場合: design.md の存在を検証
+        // Reviewer の場合: design.md の存在を検証（単一スコープ + マルチスコープ両対応）
         let designFilePath: string | undefined;
         if (task.taskType === "review" && issueNumber) {
-          const expectedPath = join(cwd, `specs/issue-${issueNumber}/design.md`);
-          if (existsSync(expectedPath)) {
-            designFilePath = `specs/issue-${issueNumber}/design.md`;
+          // task description からスコープパスを抽出（マルチスコープ対応）
+          const scopeMatch = /specs\/issue-\d+\/([^/]+)\/design\.md/.exec(task.description);
+          const designCandidates = scopeMatch
+            ? [
+                `specs/issue-${issueNumber}/${scopeMatch[1]}/design.md`,
+                `specs/issue-${issueNumber}/design.md`,
+              ]
+            : [`specs/issue-${issueNumber}/design.md`];
+
+          for (const candidate of designCandidates) {
+            if (existsSync(join(cwd, candidate))) {
+              designFilePath = candidate;
+              break;
+            }
           }
         }
 
