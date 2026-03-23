@@ -119,7 +119,13 @@ export class Orchestrator {
     const task = queue.getById(taskId);
     if (!task) return;
 
-    const result = await dispatcher.dispatch(task, config);
+    // Fixer/Builder は Reviewer と同じブランチを使う
+    let existingBranch: string | undefined;
+    if (task.taskType !== "review" && task.dependsOn) {
+      existingBranch = `agent/reviewer/${task.dependsOn}`;
+    }
+
+    const result = await dispatcher.dispatch(task, config, existingBranch);
 
     if (result.status === "completed") {
       circuitBreaker.recordSuccess();
@@ -148,28 +154,32 @@ export class Orchestrator {
             return;
           }
         } else {
-          // Fixer/Builder → 実装PR → CI 監視
-          const prResult = await resultCollector.createSinglePR(task, result.branch);
-          if (prResult.success && prResult.prUrl) {
-            const prNum = this.extractPrNumber(prResult.prUrl);
-            queue.updateStatus(taskId, "completed", {
-              result: result.result,
-              costUsd: result.costUsd,
-              turnsUsed: result.turnsUsed,
-            });
-            if (prNum) {
-              queue.updateStatus(taskId, "ci_checking", { prNumber: prNum });
-            }
-            logger.info({ taskId, prUrl: prResult.prUrl }, "Implementation PR created, CI monitoring started");
+          // Fixer/Builder → 同じブランチにプッシュ済み → 既存PRのCI監視
+          // 設計PRのPR番号を取得
+          const reviewTask = task.dependsOn ? queue.getById(task.dependsOn) : null;
+          const prUrl = reviewTask?.approvalPrUrl;
+          const prNum = prUrl ? this.extractPrNumber(prUrl) : null;
 
+          queue.updateStatus(taskId, "completed", {
+            result: result.result,
+            costUsd: result.costUsd,
+            turnsUsed: result.turnsUsed,
+          });
+
+          if (prNum) {
+            queue.updateStatus(taskId, "ci_checking", { prNumber: prNum });
+
+            // @claude /review をリクエスト
             if (this.deps.githubPoller) {
               await this.deps.githubPoller.postResultToIssue(
                 taskId,
-                `✅ 実装PRを作成しました。CIの結果を監視中です。\n\nPR: ${prResult.prUrl}`,
+                `✅ 実装が完了しました。同じPRに追加コミットしました。CIの結果を監視中です。\n\nPR: ${prUrl}`,
               );
             }
-            return;
           }
+
+          logger.info({ taskId, prNum, branch: result.branch }, "Implementation pushed to existing PR, CI monitoring started");
+          return;
         }
       }
 

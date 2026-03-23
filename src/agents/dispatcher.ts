@@ -42,10 +42,20 @@ export class Dispatcher {
     private readonly _handoffDir: string,
   ) {}
 
-  async dispatch(task: Task, config: AgentConfig): Promise<DispatchResult> {
+  async dispatch(task: Task, config: AgentConfig, existingBranch?: string): Promise<DispatchResult> {
     const role = taskTypeToRole(task.taskType as TaskType);
-    const cwd = this.worktreeManager.prepare(role, task.id);
-    const branch = this.worktreeManager.getBranchName(role, task.id);
+
+    // 既存ブランチが指定されていればそのブランチを使う（設計→実装の同一ブランチ）
+    let cwd: string;
+    let branch: string;
+    if (existingBranch) {
+      // Reviewer の worktree 上で既存ブランチに切り替え
+      cwd = this.worktreeManager.prepareExistingBranch("reviewer", existingBranch);
+      branch = existingBranch;
+    } else {
+      cwd = this.worktreeManager.prepare(role, task.id);
+      branch = this.worktreeManager.getBranchName(role, task.id);
+    }
 
     // Fixer/Builder の場合: design.md を読んでプロンプトに追加
     let prompt = task.description;

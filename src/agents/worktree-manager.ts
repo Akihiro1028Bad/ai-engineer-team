@@ -48,6 +48,26 @@ export class WorktreeManager {
     return worktreePath;
   }
 
+  /** 既存ブランチを worktree 上にチェックアウトする（設計→実装で同じブランチを使う場合） */
+  prepareExistingBranch(role: AgentRole, branch: string): string {
+    const worktreePath = join(this.worktreeDir, role);
+
+    try {
+      this.exec(`git -C ${this.projectDir} fetch origin ${branch} 2>/dev/null || true`);
+    } catch { /* fetch 失敗は続行 */ }
+
+    try {
+      this.exec(`git -C ${worktreePath} checkout ${branch}`);
+      this.exec(`git -C ${worktreePath} pull origin ${branch} 2>/dev/null || true`);
+    } catch {
+      try {
+        this.exec(`git -C ${worktreePath} checkout -B ${branch} origin/${branch}`);
+      } catch { /* フォールバック */ }
+    }
+
+    return worktreePath;
+  }
+
   /** worktree 上に未コミットの変更があるかチェック */
   hasDiff(role: AgentRole): boolean {
     const worktreePath = join(this.worktreeDir, role);
