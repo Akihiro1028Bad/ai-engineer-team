@@ -1,0 +1,218 @@
+
+> ai-agent-orchestrator@0.1.0 test
+> vitest run --reporter=verbose
+
+
+ RUN  v2.1.9 /Users/tsutsumi.akihiro/dev/ai-agent-team
+
+ ✓ tests/unit/notifications/slack-notifier.test.ts > SlackNotifier > T-SN-001: sends info with green color
+ ✓ tests/unit/notifications/slack-notifier.test.ts > SlackNotifier > T-SN-002: sends warn with yellow color
+ ✓ tests/unit/notifications/slack-notifier.test.ts > SlackNotifier > T-SN-003: sends error with red color
+ ✓ tests/unit/notifications/slack-notifier.test.ts > SlackNotifier > T-SN-004: skips when webhook URL is undefined
+ ✓ tests/unit/notifications/slack-notifier.test.ts > SlackNotifier > T-SN-005: does not throw on HTTP 500
+ ✓ tests/unit/notifications/slack-notifier.test.ts > SlackNotifier > T-SN-006: does not throw on network error
+ ✓ tests/unit/notifications/slack-notifier.test.ts > SlackNotifier > T-SN-007: daily digest includes correct body format
+ ✓ tests/unit/notifications/slack-notifier.test.ts > SlackNotifier > T-SN-008: sends successfully with empty fields
+ ✓ tests/unit/notifications/slack-notifier.test.ts > SlackNotifier > T-SN-009: approval_requested includes PR URL
+ ✓ tests/unit/notifications/slack-notifier.test.ts > SlackNotifier > T-SN-010: all 12 event types produce valid payloads
+ ✓ tests/unit/bridges/result-collector.test.ts > ResultCollector > T-RC-001: creates design PR and sends approval_requested
+ ✓ tests/unit/bridges/result-collector.test.ts > ResultCollector > T-RC-002: creates final PR and sends pipeline_pr_created
+ ✓ tests/unit/bridges/result-collector.test.ts > ResultCollector > T-RC-003: creates single PR and sends task_completed
+ ✓ tests/unit/bridges/result-collector.test.ts > ResultCollector > T-RC-004: succeeds when diff ≤ 500 lines
+ ✓ tests/unit/bridges/result-collector.test.ts > ResultCollector > T-RC-005: rejects when diff > 500 lines
+ ✓ tests/unit/bridges/result-collector.test.ts > ResultCollector > T-RC-006: handles PR creation API error
+ ✓ tests/unit/bridges/result-collector.test.ts > ResultCollector > T-RC-007: PR body includes evidence section
+ ✓ tests/unit/bridges/result-collector.test.ts > ResultCollector > T-RC-008: skips Slack when notifier has no URL
+ ✓ tests/unit/types.test.ts > TaskTypeSchema > T-TYP-001: accepts valid task types
+ ✓ tests/unit/types.test.ts > TaskTypeSchema > T-TYP-002: rejects invalid task types
+ ✓ tests/unit/types.test.ts > TaskStatusSchema > T-TYP-003: accepts all valid statuses
+ ✓ tests/unit/types.test.ts > TaskStatusSchema > T-TYP-004: rejects invalid statuses
+ ✓ tests/unit/types.test.ts > CreateTaskInputSchema > T-TYP-005: rejects when required fields are missing
+ ✓ tests/unit/types.test.ts > CreateTaskInputSchema > T-TYP-006: accepts when optional fields are omitted
+ ✓ tests/unit/types.test.ts > CreateTaskInputSchema > T-TYP-007: validates priority range 1-10
+ ✓ tests/unit/types.test.ts > AgentRoleSchema > T-TYP-008: accepts all valid roles
+ ✓ tests/unit/types.test.ts > HandoffSchema > T-TYP-009: validates a valid handoff
+ ✓ tests/unit/types.test.ts > HandoffSchema > T-TYP-010: accepts empty data object
+ ✓ tests/unit/types.test.ts > ClassificationSchema > T-TYP-011: validates single classification
+ ✓ tests/unit/types.test.ts > ClassificationSchema > T-TYP-012: validates pipeline classification
+ ✓ tests/unit/types.test.ts > ClassificationSchema > T-TYP-013: validates unclear classification
+ ✓ tests/unit/types.test.ts > ClassificationSchema > T-TYP-014: rejects pipeline with empty subTasks
+ ✓ tests/unit/types.test.ts > SlackNotificationSchema > T-TYP-015: validates a valid notification
+ ✓ tests/unit/types.test.ts > SlackNotificationSchema > T-TYP-016: rejects invalid level
+ ✓ tests/unit/agents/dispatcher.test.ts > Dispatcher > T-DSP-001: success result returns completed with metrics
+ ✓ tests/unit/agents/dispatcher.test.ts > Dispatcher > T-DSP-002: structured output is returned
+ ✓ tests/unit/agents/dispatcher.test.ts > Dispatcher > T-DSP-004: error_max_turns returns retry
+ ✓ tests/unit/agents/dispatcher.test.ts > Dispatcher > T-DSP-005: error_max_budget_usd returns retry
+ ✓ tests/unit/agents/dispatcher.test.ts > Dispatcher > T-DSP-006: error_during_execution returns retry
+ ✓ tests/unit/agents/dispatcher.test.ts > Dispatcher > T-DSP-008: handles thrown exception
+ ✓ tests/unit/agents/dispatcher.test.ts > Dispatcher > T-DSP-010: passes allowedTools correctly
+ ✓ tests/unit/agents/dispatcher.test.ts > Dispatcher > T-DSP-011: passes cwd as worktree path
+ ✓ tests/unit/agents/dispatcher.test.ts > Dispatcher > T-DSP-013: single task returns completed (not awaiting_approval)
+ ✓ tests/unit/config/env-config.test.ts > loadConfig > T-ENV-001: succeeds with all required Max plan vars
+ ✓ tests/unit/config/env-config.test.ts > loadConfig > T-ENV-002: succeeds with all required API plan vars
+ ✓ tests/unit/config/env-config.test.ts > loadConfig > T-ENV-003: fails when GITHUB_TOKEN is missing
+ ✓ tests/unit/config/env-config.test.ts > loadConfig > T-ENV-004: fails when PROJECT_DIR is missing
+ ✓ tests/unit/config/env-config.test.ts > loadConfig > T-ENV-005: fails when WORKTREE_DIR is missing
+ ✓ tests/unit/config/env-config.test.ts > loadConfig > T-ENV-006: fails when GITHUB_REPO is missing
+ ✓ tests/unit/config/env-config.test.ts > loadConfig > T-ENV-007: fails when both ANTHROPIC_API_KEY and RATE_CONTROL_ENABLED=true
+ ✓ tests/unit/config/env-config.test.ts > loadConfig > T-ENV-008: fails when DAILY_BUDGET_USD is negative
+ ✓ tests/unit/config/env-config.test.ts > loadConfig > T-ENV-009: fails when MAX_CONCURRENT is 0
+ ✓ tests/unit/config/env-config.test.ts > loadConfig > T-ENV-010: defaults MAX_CONCURRENT to 1
+ ✓ tests/unit/config/env-config.test.ts > loadConfig > T-ENV-011: defaults RATE_COOLDOWN_SECONDS to 60
+ ✓ tests/unit/config/env-config.test.ts > loadConfig > T-ENV-012: succeeds when SLACK_WEBHOOK_URL is missing
+ ✓ tests/unit/config/env-config.test.ts > loadConfig > T-ENV-013: fails when SLACK_WEBHOOK_URL is invalid
+ ✓ tests/unit/config/env-config.test.ts > loadConfig > T-ENV-014: fails when GITHUB_REPO has invalid format
+ ✓ tests/unit/config/env-config.test.ts > loadConfig > T-ENV-015: defaults MAX_TASKS_PER_WINDOW to 150
+ ✓ tests/unit/config/env-config.test.ts > loadConfig > T-ENV-016: defaults RATE_LIMIT_WARN_THRESHOLD to 0.1
+ ✓ tests/unit/agents/classifier.test.ts > Classifier > T-CLS-001: bug label → fix (single)
+ ✓ tests/unit/agents/classifier.test.ts > Classifier > T-CLS-002: feature label → pipeline (review→build→document)
+ ✓ tests/unit/agents/classifier.test.ts > Classifier > T-CLS-003: docs label → document (single)
+ ✓ tests/unit/agents/classifier.test.ts > Classifier > T-CLS-004: no type label → Haiku classifies from body
+ ✓ tests/unit/agents/classifier.test.ts > Classifier > T-CLS-005: empty body → unclear
+ ✓ tests/unit/agents/classifier.test.ts > Classifier > T-CLS-006: very short body → unclear
+ ✓ tests/unit/queue/task-queue.test.ts > TaskQueue > push > T-TQ-001: adds a single task
+ ✓ tests/unit/queue/task-queue.test.ts > TaskQueue > push > T-TQ-002: adds task with dependency
+ ✓ tests/unit/queue/task-queue.test.ts > TaskQueue > push > T-TQ-003: rejects duplicate ID
+ ✓ tests/unit/queue/task-queue.test.ts > TaskQueue > push > T-TQ-004: adds pipeline subtasks in batch
+ ✓ tests/unit/queue/task-queue.test.ts > TaskQueue > getNext > T-TQ-005: returns null when queue is empty
+ ✓ tests/unit/queue/task-queue.test.ts > TaskQueue > getNext > T-TQ-006: returns the pending task
+ ✓ tests/unit/queue/task-queue.test.ts > TaskQueue > getNext > T-TQ-007: returns higher priority first
+ ✓ tests/unit/queue/task-queue.test.ts > TaskQueue > getNext > T-TQ-008: same priority returns older first
+ ✓ tests/unit/queue/task-queue.test.ts > TaskQueue > getNext > T-TQ-009: skips task with uncompleted dependency
+ ✓ tests/unit/queue/task-queue.test.ts > TaskQueue > getNext > T-TQ-010: returns task when dependency is completed
+ ✓ tests/unit/queue/task-queue.test.ts > TaskQueue > getNext > T-TQ-011: skips task when dependency is failed
+ ✓ tests/unit/queue/task-queue.test.ts > TaskQueue > getNext > T-TQ-012: skips task when dependency is awaiting_approval
+ ✓ tests/unit/queue/task-queue.test.ts > TaskQueue > updateStatus > T-TQ-013: pending → in_progress sets startedAt
+ ✓ tests/unit/queue/task-queue.test.ts > TaskQueue > updateStatus > T-TQ-014: in_progress → completed with result data
+ ✓ tests/unit/queue/task-queue.test.ts > TaskQueue > updateStatus > T-TQ-015: in_progress → awaiting_approval with PR URL
+ ✓ tests/unit/queue/task-queue.test.ts > TaskQueue > updateStatus > T-TQ-016: in_progress → pending (retry, count < 3)
+ ✓ tests/unit/queue/task-queue.test.ts > TaskQueue > updateStatus > T-TQ-017: in_progress → failed (retry count >= 3)
+ ✓ tests/unit/queue/task-queue.test.ts > TaskQueue > updateStatus > T-TQ-018: approve → unblocks successor tasks
+ ✓ tests/unit/queue/task-queue.test.ts > TaskQueue > updateStatus > T-TQ-019: reject → cancels successor tasks
+ ✓ tests/unit/queue/task-queue.test.ts > TaskQueue > recoverFromCrash > T-TQ-020: resets in_progress to pending
+ ✓ tests/unit/queue/task-queue.test.ts > TaskQueue > recoverFromCrash > T-TQ-021: marks as failed if retry exceeds 3
+ ✓ tests/unit/queue/task-queue.test.ts > TaskQueue > recoverFromCrash > T-TQ-022: does not touch awaiting_approval tasks
+ ✓ tests/unit/queue/task-queue.test.ts > TaskQueue > recoverFromCrash > T-TQ-023: does not touch completed/failed tasks
+ ✓ tests/unit/queue/task-queue.test.ts > TaskQueue > queries > T-TQ-024: isDuplicate detects existing source
+ ✓ tests/unit/queue/task-queue.test.ts > TaskQueue > queries > T-TQ-025: getByStatus filters correctly
+ ✓ tests/unit/queue/task-queue.test.ts > TaskQueue > queries > T-TQ-026: getAwaitingApproval returns tasks with PR URLs
+ ✓ tests/unit/queue/task-queue.test.ts > TaskQueue > queries > T-TQ-027: getDailyDigest returns correct counts
+ ✓ tests/unit/queue/task-queue.test.ts > TaskQueue > queries > T-TQ-028: cancelPipelineSuccessors cancels all
+ ✓ tests/unit/queue/task-queue.test.ts > TaskQueue > queries > T-TQ-029: transaction atomicity on batch push error
+ ✓ tests/unit/agents/classifier.test.ts > Classifier > T-CLS-007: Haiku API error → unclear
+ ✓ tests/unit/agents/classifier.test.ts > Classifier > T-CLS-008: Haiku returns invalid JSON → unclear
+ ✓ tests/unit/agents/classifier.test.ts > Classifier > T-CLS-009: pipeline subtask dependencies are correct
+ ✓ tests/unit/agents/classifier.test.ts > Classifier > T-CLS-010: Haiku query uses model haiku
+ ✓ tests/unit/agents/classifier.test.ts > Classifier > T-CLS-011: unclear posts GitHub Issue comment
+ ✓ tests/unit/sources/github-poller.test.ts > GitHubPoller > pollIssues > T-GHP-001: detects ai-task labeled issue
+ ✓ tests/unit/sources/github-poller.test.ts > GitHubPoller > pollIssues > T-GHP-002: ignores issue without ai-task label
+ ✓ tests/unit/sources/github-poller.test.ts > GitHubPoller > pollIssues > T-GHP-003: ignores already processed issue
+ ✓ tests/unit/sources/github-poller.test.ts > GitHubPoller > pollIssues > T-GHP-004: processes multiple issues
+ ✓ tests/unit/sources/github-poller.test.ts > GitHubPoller > pollIssues > T-GHP-005: handles GitHub API 5xx
+ ✓ tests/unit/sources/github-poller.test.ts > GitHubPoller > pollIssues > T-GHP-006: handles GitHub rate limit 403
+ ✓ tests/unit/sources/github-poller.test.ts > GitHubPoller > pollIssues > T-GHP-007: handles network error
+ ✓ tests/unit/sources/github-poller.test.ts > GitHubPoller > pollApprovals > T-GHP-008: approve unblocks successor
+ ✓ tests/unit/sources/github-poller.test.ts > GitHubPoller > pollApprovals > T-GHP-009: changes_requested keeps awaiting
+ ✓ tests/unit/sources/github-poller.test.ts > GitHubPoller > pollApprovals > T-GHP-010: closed PR cancels pipeline
+ ✓ tests/unit/sources/github-poller.test.ts > GitHubPoller > pollApprovals > T-GHP-011: no awaiting tasks skips check
+ ✓ tests/unit/sources/github-poller.test.ts > GitHubPoller > pollApprovals > T-GHP-013: PR API error is handled gracefully
+ ✓ tests/unit/safety/circuit-breaker.test.ts > CircuitBreaker > T-CB2-001: initial state is CLOSED
+ ✓ tests/unit/safety/circuit-breaker.test.ts > CircuitBreaker > T-CB2-002: success resets counter
+ ✓ tests/unit/safety/circuit-breaker.test.ts > CircuitBreaker > T-CB2-003: failure increments counter
+ ✓ tests/unit/safety/circuit-breaker.test.ts > CircuitBreaker > T-CB2-004: 5 consecutive failures open circuit
+ ✓ tests/unit/safety/circuit-breaker.test.ts > CircuitBreaker > T-CB2-005: OPEN state rejects execution
+ ✓ tests/unit/safety/circuit-breaker.test.ts > CircuitBreaker > T-CB2-006: transitions to HALF_OPEN after timeout
+ ✓ tests/unit/safety/circuit-breaker.test.ts > CircuitBreaker > T-CB2-007: HALF_OPEN success → CLOSED
+ ✓ tests/unit/safety/circuit-breaker.test.ts > CircuitBreaker > T-CB2-008: HALF_OPEN failure → OPEN
+ ✓ tests/unit/safety/circuit-breaker.test.ts > CircuitBreaker > T-CB2-009: interleaved success resets counter
+ ✓ tests/unit/safety/circuit-breaker.test.ts > CircuitBreaker > T-CB2-010: remaining ms calculation
+ ✓ tests/contract/handoff-schema.test.ts > Contract: Handoff schemas > T-CTR-001: Reviewer handoff data
+ ✓ tests/contract/handoff-schema.test.ts > Contract: Handoff schemas > T-CTR-002: Fixer handoff data
+ ✓ tests/contract/handoff-schema.test.ts > Contract: Handoff schemas > T-CTR-003: Builder handoff data
+ ✓ tests/contract/handoff-schema.test.ts > Contract: Handoff schemas > T-CTR-004: Scribe handoff data
+ ✓ tests/contract/handoff-schema.test.ts > Contract: Handoff schemas > T-CTR-005: All 12 Slack events validate
+ ✓ tests/contract/handoff-schema.test.ts > Contract: Handoff schemas > T-CTR-006: Classification single response
+ ✓ tests/contract/handoff-schema.test.ts > Contract: Handoff schemas > T-CTR-007: Classification pipeline response
+ ✓ tests/unit/queue/schema.test.ts > initSchema > T-SCH-001: creates tasks table
+ ✓ tests/unit/queue/schema.test.ts > initSchema > T-SCH-002: enables WAL mode (in-memory returns 'memory')
+ ✓ tests/unit/queue/schema.test.ts > initSchema > T-SCH-003: creates all indexes
+ ✓ tests/unit/queue/schema.test.ts > initSchema > T-SCH-004: double init is safe
+ ✓ tests/unit/queue/schema.test.ts > initSchema > T-SCH-005: rejects invalid task_type
+ ✓ tests/unit/queue/schema.test.ts > initSchema > T-SCH-006: rejects invalid status
+ ✓ tests/unit/queue/schema.test.ts > initSchema > T-SCH-007: rejects priority out of range
+ ✓ tests/unit/queue/schema.test.ts > initSchema > T-SCH-008: rejects retry_count > 3
+ ✓ tests/unit/queue/schema.test.ts > initSchema > T-SCH-009: defaults priority to 5
+ ✓ tests/unit/queue/schema.test.ts > initSchema > T-SCH-010: defaults status to pending
+ ✓ tests/unit/queue/schema.test.ts > initSchema > T-SCH-011: defaults created_at to current time
+ ✓ tests/integration/orchestrator.test.ts > Orchestrator integration > T-ORC-001: empty queue runs one tick without dispatch
+ ✓ tests/integration/full-pipeline.test.ts > Full pipeline (US3) > T056-1: feature issue creates 3-step pipeline
+ ✓ tests/integration/full-pipeline.test.ts > Full pipeline (US3) > T056-2: enhancement label also triggers pipeline
+ ✓ tests/integration/full-pipeline.test.ts > Full pipeline (US3) > T056-3: pipeline with approval gate flow
+ ✓ tests/unit/safety/rate-controller.test.ts > RateController > T-RC2-001: disabled mode returns immediately
+ ✓ tests/unit/safety/rate-controller.test.ts > RateController > T-RC2-002: inserts cooldown when too soon
+ ✓ tests/unit/safety/rate-controller.test.ts > RateController > T-RC2-003: no cooldown when enough time passed
+ ✓ tests/unit/safety/rate-controller.test.ts > RateController > T-RC2-004: blocks when window limit reached
+ ✓ tests/unit/safety/rate-controller.test.ts > RateController > T-RC2-005: resets window after 5 hours
+ ✓ tests/unit/safety/rate-controller.test.ts > RateController > T-RC2-006: increments task count
+ ✓ tests/unit/safety/rate-controller.test.ts > RateController > T-RC2-007: warns when approaching limit (10%)
+ ✓ tests/unit/safety/rate-controller.test.ts > RateController > T-RC2-008: updates lastTaskTime
+ ✓ tests/unit/logging/logger.test.ts > createLogger > T-LOG-001: returns a pino logger instance
+ ✓ tests/unit/logging/logger.test.ts > createLogger > T-LOG-002: child logger includes context fields
+ ✓ tests/unit/logging/logger.test.ts > createLogger > T-LOG-003: debug level is suppressed at info level
+ ✓ tests/unit/logging/logger.test.ts > createLogger > T-LOG-004: info level outputs
+ ✓ tests/unit/logging/logger.test.ts > createLogger > T-LOG-005: output is valid JSON (JSON Lines)
+ ✓ tests/integration/orchestrator.test.ts > Orchestrator integration > T-ORC-002: dispatches review task and marks completed
+ ✓ tests/integration/orchestrator.test.ts > Orchestrator integration > T-ORC-004: skips dispatch when circuit breaker is OPEN
+ ✓ tests/integration/orchestrator.test.ts > Orchestrator integration > T-ORC-006: skips dispatch when budget exceeded
+ ✓ tests/unit/bridges/context-bridge.test.ts > context-bridge > T-CB-001: writes handoff JSON file
+ ✓ tests/unit/bridges/context-bridge.test.ts > context-bridge > T-CB-002: reads handoff JSON and validates
+ ✓ tests/unit/bridges/context-bridge.test.ts > context-bridge > T-CB-003: returns null for missing file
+ ✓ tests/unit/bridges/context-bridge.test.ts > context-bridge > T-CB-004: returns null for invalid JSON
+ ✓ tests/unit/bridges/context-bridge.test.ts > context-bridge > T-CB-005: creates directory if not exists
+ ✓ tests/unit/bridges/context-bridge.test.ts > context-bridge > T-CB-006: builds prompt insert text
+ ✓ tests/integration/orchestrator.test.ts > Orchestrator integration > T-ORC-007: crash recovery on start
+ ✓ tests/integration/orchestrator.test.ts > Orchestrator integration > T-ORC-010: graceful shutdown
+ ✓ tests/unit/agents/worktree-manager.test.ts > WorktreeManager > T-WTM-001: creates worktree and branch
+ ✓ tests/unit/agents/worktree-manager.test.ts > WorktreeManager > T-WTM-002: uses correct branch naming
+ ✓ tests/unit/agents/worktree-manager.test.ts > WorktreeManager > T-WTM-003: cleanup removes branch
+ ✓ tests/unit/agents/worktree-manager.test.ts > WorktreeManager > T-WTM-004: handles exec errors gracefully
+ ✓ tests/unit/agents/worktree-manager.test.ts > WorktreeManager > T-WTM-005: returns correct worktree path for each role
+ ✓ tests/unit/agents/agent-config.test.ts > getAgentConfig > T-AC-001: Reviewer config is correct
+ ✓ tests/unit/agents/agent-config.test.ts > getAgentConfig > T-AC-002: Fixer config is correct
+ ✓ tests/unit/agents/agent-config.test.ts > getAgentConfig > T-AC-003: Builder config is correct
+ ✓ tests/unit/agents/agent-config.test.ts > getAgentConfig > T-AC-004: Scribe config is correct
+ ✓ tests/unit/agents/agent-config.test.ts > getAgentConfig > T-AC-005: throws for invalid role
+ ✓ tests/unit/agents/agent-config.test.ts > getAgentConfig > T-AC-006: Reviewer has no Bash tools
+ ✓ tests/unit/agents/agent-config.test.ts > getAgentConfig > T-AC-007: Scribe has no Bash tools
+ ✓ tests/unit/logging/log-rotation.test.ts > rotateOldLogs > T-LR-001: retains logs within 30 days
+ ✓ tests/unit/logging/log-rotation.test.ts > rotateOldLogs > T-LR-002: deletes logs older than 30 days
+ ✓ tests/unit/logging/log-rotation.test.ts > rotateOldLogs > T-LR-003: handles empty directory
+ ✓ tests/unit/logging/log-rotation.test.ts > rotateOldLogs > T-LR-004: ignores non-jsonl files
+ ✓ tests/unit/logging/log-rotation.test.ts > rotateOldLogs > T-LR-005: creates directory if it does not exist
+ ✓ tests/unit/sources/manual-cli.test.ts > parseAndPush (manual-cli) > T-CLI-001: succeeds with required args
+ ✓ tests/unit/sources/manual-cli.test.ts > parseAndPush (manual-cli) > T-CLI-002: fails when --type is missing
+ ✓ tests/unit/sources/manual-cli.test.ts > parseAndPush (manual-cli) > T-CLI-003: fails for invalid type
+ ✓ tests/unit/sources/manual-cli.test.ts > parseAndPush (manual-cli) > T-CLI-004: accepts --priority
+ ✓ tests/unit/sources/manual-cli.test.ts > parseAndPush (manual-cli) > T-CLI-005: generates manual-{N} ID
+ ✓ tests/unit/sources/manual-cli.test.ts > parseAndPush (manual-cli) > T-CLI-006: accepts --depends-on
+ ✓ tests/unit/sources/cron-scheduler.test.ts > CronScheduler > T-CRN-001: creates review task at 03:00
+ ✓ tests/unit/sources/cron-scheduler.test.ts > CronScheduler > T-CRN-002: creates document task on Monday 09:00
+ ✓ tests/unit/sources/cron-scheduler.test.ts > CronScheduler > T-CRN-003: creates nothing at 15:00
+ ✓ tests/unit/sources/cron-scheduler.test.ts > CronScheduler > T-CRN-004: task ID has correct format
+ ✓ tests/unit/sources/cron-scheduler.test.ts > CronScheduler > T-CRN-005: skips duplicate on same day
+ ✓ tests/unit/safety/budget-guard.test.ts > BudgetGuard > T-BG-001: allows when within budget
+ ✓ tests/unit/safety/budget-guard.test.ts > BudgetGuard > T-BG-002: blocks when budget exceeded
+ ✓ tests/unit/safety/budget-guard.test.ts > BudgetGuard > T-BG-003: always allows when disabled (no limit)
+ ✓ tests/unit/safety/budget-guard.test.ts > BudgetGuard > T-BG-004: accumulates costs
+ ✓ tests/unit/safety/budget-guard.test.ts > BudgetGuard > T-BG-005: resets daily
+ ✓ tests/unit/safety/budget-guard.test.ts > BudgetGuard > T-BG-006: blocks at exact limit
+ ✓ tests/integration/daily-digest.test.ts > Daily digest (US4) > T060: getDailyDigest returns correct metrics including pending approvals
+ ✓ tests/unit/queue/migrations.test.ts > runMigrations > T-MIG-001: creates schema_version table on first run
+ ✓ tests/unit/queue/migrations.test.ts > runMigrations > T-MIG-002: skips if already at latest version
+ ✓ tests/unit/queue/migrations.test.ts > runMigrations > T-MIG-003: applies only pending migrations
+
+ Test Files  24 passed (24)
+      Tests  205 passed (205)
+   Start at  09:14:48
+   Duration  979ms (transform 567ms, setup 0ms, collect 1.28s, tests 358ms, environment 3ms, prepare 1.60s)
+

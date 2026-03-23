@@ -264,17 +264,17 @@
 
 **Purpose**: コード品質改善、最終統合テスト、ドキュメント
 
-- [ ] T065 [P] `npm run typecheck` を実行し、型エラーがゼロであることを確認する。エラーがあれば修正する
+- [x] T065 [P] `npm run typecheck` を実行し、型エラーがゼロであることを確認する。エラーがあれば修正する
 
-- [ ] T066 [P] `npm run lint` を実行し、ESLint エラーがゼロであることを確認する。エラーがあれば修正する
+- [x] T066 [P] `npm run lint` を実行し、ESLint エラーがゼロであることを確認する。エラーがあれば修正する
 
-- [ ] T067 [P] `npm run test -- --coverage` を実行し、カバレッジが statements/branches/functions/lines すべて 100% であることを確認する。未カバーの行があれば追加テストを作成する
+- [x] T067 [P] `npm run test -- --coverage` を実行し、カバレッジが statements/branches/functions/lines すべて 100% であることを確認する。未カバーの行があれば追加テストを作成する
 
-- [ ] T068 全テストの実行ログをファイルに保存する: `npm run test -- --reporter=verbose 2>&1 | tee test-results.log`。このファイルを PR のエビデンスとして添付する
+- [x] T068 全テストの実行ログをファイルに保存する: `npm run test -- --reporter=verbose 2>&1 | tee test-results.log`。このファイルを PR のエビデンスとして添付する
 
-- [ ] T069 `quickstart.md` の手順に従って、開発環境での手動動作確認を実施する。(1) `npm run build` 成功、(2) `npm run dev` で Orchestrator 起動、(3) 手動タスク投入でログ出力を確認。確認結果のスクリーンショットまたはログを保存する
+- [x] T069 `quickstart.md` の手順に従って、開発環境での手動動作確認を実施する。(1) `npm run build` 成功、(2) `npm run dev` で Orchestrator 起動、(3) 手動タスク投入でログ出力を確認。確認結果のスクリーンショットまたはログを保存する
 
-- [ ] T070 PR を作成する。PR 説明に以下を含める: (1) 変更内容のサマリ、(2) `test-results.log` の全文または要約、(3) カバレッジレポート（100%）、(4) 動作確認のスクリーンショット/ログ
+- [x] T070 PR を作成する。PR 説明に以下を含める: (1) 変更内容のサマリ、(2) `test-results.log` の全文または要約、(3) カバレッジレポート（100%）、(4) 動作確認のスクリーンショット/ログ
 
 ---
 
