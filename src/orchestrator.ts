@@ -86,6 +86,10 @@ export interface OrchestratorDeps {
 const PATTERN_UPDATE_INTERVAL = 100;
 /** Stale PR チェック間隔（10 tick ごと = 約5分） */
 const STALE_PR_CHECK_INTERVAL = 10;
+/** DAG 承認ゲート: ポーリング間隔（30秒） */
+const APPROVAL_POLL_INTERVAL_MS = 30_000;
+/** DAG 承認ゲート: タイムアウト（7日） */
+const APPROVAL_TIMEOUT_MS = 7 * 24 * 60 * 60 * 1000;
 
 export class Orchestrator {
   private running = false;
@@ -312,12 +316,13 @@ export class Orchestrator {
         complexity: analysisReport.estimatedComplexity,
       }, "Analysis complete");
 
-      // Step 2: Planner（Opus, ~$0.80）
+      // Step 2: Planner（Opus, ~$0.80）+ Pattern Memory 注入
       this.deps.statusEmitter?.emitProgress(taskId, "実行計画を生成中...");
 
+      // Pattern Memory からコンテキストを構築して Planner に注入
       const patternContext = this.deps.patternMemory?.buildPlannerContext(
         task.taskType, undefined,
-      );
+      ) ?? "";
 
       const plan = await this.plannerAgent!.plan({
         taskId,
@@ -329,6 +334,19 @@ export class Orchestrator {
         patternContext: patternContext || undefined,
         cwd,
       });
+
+      // ModelRouter で各ノードのモデルを動的選択
+      if (this.deps.modelRouter) {
+        for (const node of plan.nodes) {
+          const { model, reason } = this.deps.modelRouter.selectModel(
+            node.agentRole, task.taskType, node.model, undefined,
+          );
+          if (model !== node.model) {
+            logger.info({ taskId, nodeId: node.id, from: node.model, to: model, reason }, "Model overridden by router");
+            (node as { model: string }).model = model;
+          }
+        }
+      }
 
       logger.info({
         taskId,
@@ -400,62 +418,123 @@ export class Orchestrator {
         `バッチ ${batch.order + 1}/${schedule.batches.length} を実行中（${batch.nodes.length} ノード）`,
       );
 
-      // バッチ内のノードを実行（現時点は順次、将来は並列可能）
       for (const node of batch.nodes) {
         if (!this.running) return;
 
-        // AgentRunner が利用可能なら v3.0 実行、なければ v2.1 Dispatcher にフォールバック
-        if (this.deps.agentRunner) {
-          const result = await this.deps.agentRunner.run({
-            taskId,
-            planId: plan.taskId,
-            node,
-            cwd: ".", // TODO: worktree パス
-          });
+        if (!this.deps.agentRunner) {
+          logger.info({ taskId, nodeId: node.id }, "Falling back to v2.1 dispatcher for node");
+          continue;
+        }
 
-          // Eval 記録
-          this.deps.evalStore?.record({
-            taskId,
-            planId: plan.taskId,
+        // Per-Agent Circuit Breaker チェック
+        if (this.deps.perAgentCircuitBreaker && !this.deps.perAgentCircuitBreaker.canExecute(node.agentRole, "v3")) {
+          logger.warn({ taskId, nodeId: node.id, agent: node.agentRole }, "Per-agent circuit breaker OPEN — skipping node");
+          continue;
+        }
+
+        // Handoff コンテキスト: 前段ノードの結果を注入
+        let contextInsert: string | undefined;
+        if (this.deps.handoffStore && node.dependsOn.length > 0) {
+          const reports = this.deps.handoffStore.getForNode(plan.taskId, node.id);
+          if (reports.length > 0) {
+            contextInsert = this.deps.handoffStore.buildContextInsert(reports);
+          }
+        }
+
+        const result = await this.deps.agentRunner.run({
+          taskId,
+          planId: plan.taskId,
+          node,
+          cwd: ".",
+          contextInsert,
+        });
+
+        // Eval 記録
+        this.deps.evalStore?.record({
+          taskId,
+          planId: plan.taskId,
+          nodeId: node.id,
+          agentRole: node.agentRole,
+          model: node.model,
+          costUsd: result.costUsd,
+          durationMs: result.durationMs,
+          turnsUsed: result.turnsUsed,
+          success: result.status === "completed",
+          failureCategory: result.status !== "completed" ? "unknown" : undefined,
+          issueLabels: [],
+        });
+
+        // Per-Agent CB 記録
+        if (this.deps.perAgentCircuitBreaker) {
+          if (result.status === "completed") {
+            this.deps.perAgentCircuitBreaker.recordSuccess(node.agentRole, "v3");
+          } else {
+            this.deps.perAgentCircuitBreaker.recordFailure(node.agentRole, "v3");
+          }
+        }
+
+        // Validation Gate
+        if (this.deps.validationGate && result.status === "completed") {
+          const validation = this.deps.validationGate.validate({
             nodeId: node.id,
-            agentRole: node.agentRole,
-            model: node.model,
-            costUsd: result.costUsd,
-            durationMs: result.durationMs,
-            turnsUsed: result.turnsUsed,
-            success: result.status === "completed",
-            failureCategory: result.status !== "completed" ? "unknown" : undefined,
-            issueLabels: [],
+            planId: plan.taskId,
+            structuredOutput: result.structuredOutput,
           });
 
-          // Validation Gate
-          if (this.deps.validationGate && result.status === "completed") {
-            const validation = this.deps.validationGate.validate({
-              nodeId: node.id,
-              planId: plan.taskId,
-              structuredOutput: result.structuredOutput,
-            });
+          if (!validation.passed) {
+            logger.warn({ taskId, nodeId: node.id }, "Validation gate failed");
+          }
+        }
 
-            if (!validation.passed) {
-              logger.warn({ taskId, nodeId: node.id }, "Validation gate failed");
-              // 検証失敗 → リトライ（maxRetries まで）
-              // 現時点では警告のみで続行
+        if (result.status === "failed") {
+          logger.error({ taskId, nodeId: node.id, error: result.error }, "Node failed");
+          queue.retryTask(taskId);
+          this.deps.statusEmitter?.emitTaskFailed(taskId, result.error ?? "Node failed");
+          this.deps.circuitBreaker.recordFailure();
+          return;
+        }
+
+        this.deps.budgetGuard.recordCost(result.costUsd);
+
+        // === DAG 承認ゲート ===
+        // Designer ノード完了後: 設計 PR を作成し、承認されるまで DAG を一時停止
+        if (node.agentRole === "designer" && result.pushed && result.branch) {
+          const collector = this.findCollectorForTask(taskId);
+          if (collector) {
+            const task = queue.getById(taskId);
+            if (task) {
+              const prResult = await collector.createDesignPR(task, result.branch);
+              if (prResult.success && prResult.prUrl) {
+                queue.updateStatus(taskId, "awaiting_approval", {
+                  approvalPrUrl: prResult.prUrl,
+                  costUsd: result.costUsd,
+                });
+
+                logger.info({ taskId, prUrl: prResult.prUrl }, "Design PR created — DAG paused for approval");
+                this.deps.statusEmitter?.emitProgress(taskId, `設計 PR 作成完了。承認待ち: ${prResult.prUrl}`);
+
+                const poller = this.findPollerForTask(taskId);
+                if (poller) {
+                  await poller.postResultToIssue(
+                    taskId,
+                    `📋 設計書 PR を作成しました。確認・承認をお願いします。\n\nPR: ${prResult.prUrl}\n\n承認後、自動的に実装を開始します。`,
+                  );
+                }
+
+                // DAG を一時停止: 承認されるまでポーリングで待機
+                const approved = await this.waitForApproval(taskId, APPROVAL_POLL_INTERVAL_MS, APPROVAL_TIMEOUT_MS);
+                if (!approved) {
+                  logger.warn({ taskId }, "Design approval timed out or rejected — DAG aborted");
+                  this.deps.statusEmitter?.emitTaskFailed(taskId, "設計承認がタイムアウトまたは却下されました");
+                  return;
+                }
+
+                logger.info({ taskId }, "Design approved — resuming DAG execution");
+                queue.updateStatus(taskId, "in_progress");
+                this.deps.statusEmitter?.emitProgress(taskId, "設計が承認されました。実装を開始します。");
+              }
             }
           }
-
-          if (result.status === "failed") {
-            logger.error({ taskId, nodeId: node.id, error: result.error }, "Node failed");
-            queue.retryTask(taskId);
-            this.deps.statusEmitter?.emitTaskFailed(taskId, result.error ?? "Node failed");
-            this.deps.circuitBreaker.recordFailure();
-            return;
-          }
-
-          this.deps.budgetGuard.recordCost(result.costUsd);
-        } else {
-          // フォールバック: v2.1 Dispatcher で実行
-          logger.info({ taskId, nodeId: node.id }, "Falling back to v2.1 dispatcher for node");
-          // v2.1 フローに委譲するため、ここでは skip
         }
       }
     }
@@ -665,6 +744,43 @@ export class Orchestrator {
   // ========================================
   // ヘルパー
   // ========================================
+
+  /**
+   * DAG 承認ゲート: タスクが承認されるまでポーリングで待機する。
+   * GitHubPoller.pollApprovals() がバックグラウンドで承認/却下を検出し、
+   * TaskQueue のステータスを更新するので、ここではステータスを監視するだけ。
+   */
+  private async waitForApproval(taskId: string, intervalMs: number, timeoutMs: number): Promise<boolean> {
+    const { queue, logger } = this.deps;
+    const startTime = Date.now();
+
+    while (this.running && (Date.now() - startTime) < timeoutMs) {
+      await this.sleep(intervalMs);
+
+      // ポーリング中も承認チェックを実行
+      if (this.deps.repoComponents) {
+        for (const repo of this.deps.repoComponents) {
+          try { await repo.githubPoller.pollApprovals(); } catch { /* non-critical */ }
+        }
+      } else if (this.deps.githubPoller) {
+        try { await this.deps.githubPoller.pollApprovals(); } catch { /* non-critical */ }
+      }
+
+      const task = queue.getById(taskId);
+      if (!task) return false;
+
+      // 承認された（pollApprovals が approveTask を呼び、status が変わる）
+      if (task.status !== "awaiting_approval") {
+        if (task.status === "failed") return false; // 却下
+        return true; // 承認済み（pending or in_progress に戻る）
+      }
+
+      logger.debug({ taskId, elapsed: Date.now() - startTime }, "Waiting for design approval...");
+    }
+
+    logger.warn({ taskId, timeoutMs }, "Design approval wait timed out");
+    return false;
+  }
 
   /** タスク ID からリポジトリの GitHubPoller を特定する */
   private findPollerForTask(_taskId: string): GitHubPoller | undefined {

@@ -37,6 +37,8 @@ import { GapDetector } from "./toolforge/gap-detector.js";
 import { ToolSynthesizer } from "./toolforge/tool-synthesizer.js";
 import { SandboxValidator } from "./toolforge/sandbox-validator.js";
 import { PerAgentCircuitBreaker } from "./safety/per-agent-circuit-breaker.js";
+import { HierarchicalBudgetGuard } from "./safety/hierarchical-budget-guard.js";
+import { PromptOptimizer } from "./feedback/prompt-optimizer.js";
 import { Orchestrator } from "./orchestrator.js";
 import type { RepoConfig } from "./types.js";
 
@@ -76,6 +78,9 @@ async function main(): Promise<void> {
   const slackNotifier = new SlackNotifier(config.slackWebhookUrl);
   const cronScheduler = new CronScheduler(queue);
   const statusEmitter = new StatusEmitter();
+  const hierarchicalBudget = config.dailyBudgetUsd
+    ? new HierarchicalBudgetGuard(config.dailyBudgetUsd, logger)
+    : undefined;
 
   // v3.0 共有コンポーネント
   const handoffStore = new HandoffStore(db, logger);
@@ -99,6 +104,28 @@ async function main(): Promise<void> {
       fields: { key },
       timestamp: new Date().toISOString(),
     });
+  });
+
+  // Prompt Optimizer 月次 Cron 登録（毎月1日 04:00）
+  const promptOptimizer = new PromptOptimizer(evalStore, feedbackLearner, logger);
+  let lastPromptOptMonth = -1;
+  cronScheduler.registerJob("monthly_prompt_optimization", (now) => {
+    return now.getDate() === 1 && now.getHours() === 4 && now.getMonth() !== lastPromptOptMonth;
+  }, () => {
+    lastPromptOptMonth = new Date().getMonth();
+    const results = promptOptimizer.analyze();
+    if (results.length > 0) {
+      const report = promptOptimizer.formatReport(results);
+      logger.info({ suggestions: results.length }, "Monthly prompt optimization completed");
+      void slackNotifier.send({
+        level: "info",
+        event: "prompt_optimization",
+        title: "月次プロンプト最適化レポート",
+        body: report.slice(0, 500),
+        fields: { suggestions: String(results.reduce((s, r) => s + r.suggestions.length, 0)) },
+        timestamp: new Date().toISOString(),
+      });
+    }
   });
 
   // マルチリポジトリ設定の読み込み

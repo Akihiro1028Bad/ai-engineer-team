@@ -300,13 +300,67 @@ export class ClassifierV3 {
     }
   }
 
-  /** Sonnet でリ分類（フォールバック、$0.10） */
+  /** Sonnet で再分類（Haiku 信頼度 < 0.7 の場合のフォールバック、$0.10） */
   private async reclassifyWithSonnet(
-    _issue: Issue,
+    issue: Issue,
     originalConfidence: number,
   ): Promise<number> {
-    // TODO: Phase 2 完全版で Sonnet 呼出しを実装
-    // 現時点では元の信頼度をそのまま返す
+    try {
+      const { query } = await import("@anthropic-ai/claude-agent-sdk");
+
+      let structuredOutput: unknown = null;
+      let resultText: string | undefined;
+
+      for await (const message of query({
+        prompt: [
+          "以下の GitHub Issue の分類を再確認してください。前回の分類の信頼度が低かったため、より詳細に分析します。",
+          "",
+          `タイトル: ${issue.title}`,
+          `ラベル: ${issue.labels.join(", ") || "なし"}`,
+          `本文: ${issue.body}`,
+          "",
+          "taskType（fix/build/document）と confidence（0.0-1.0）を返してください。",
+        ].join("\n"),
+        options: {
+          model: "sonnet",
+          maxTurns: 1,
+          maxBudgetUsd: 0.10,
+          allowedTools: [],
+          permissionMode: "dontAsk",
+          outputFormat: {
+            type: "json_schema",
+            schema: {
+              type: "object" as const,
+              properties: {
+                taskType: { type: "string" as const, enum: ["fix", "build", "document"] },
+                confidence: { type: "number" as const },
+              },
+              required: ["taskType", "confidence"],
+            },
+          },
+        },
+      }) as AsyncIterable<{ type: string; structured_output?: unknown; result?: string }>) {
+        if (message.type === "result") {
+          structuredOutput = message.structured_output;
+          resultText = message.result;
+        }
+      }
+
+      if (!structuredOutput && resultText) {
+        const jsonMatch = /\{[\s\S]*\}/.exec(resultText);
+        if (jsonMatch) {
+          try { structuredOutput = JSON.parse(jsonMatch[0]) as unknown; } catch { /* ignore */ }
+        }
+      }
+
+      if (structuredOutput && typeof structuredOutput === "object" && structuredOutput !== null) {
+        const conf = (structuredOutput as { confidence?: number }).confidence;
+        if (typeof conf === "number" && conf > originalConfidence) {
+          return conf;
+        }
+      }
+    } catch { /* Sonnet fallback failed, use original */ }
+
     return originalConfidence;
   }
 

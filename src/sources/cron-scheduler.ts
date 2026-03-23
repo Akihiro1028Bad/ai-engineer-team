@@ -4,8 +4,18 @@ function pad2(n: number): string {
   return String(n).padStart(2, "0");
 }
 
+/** Cron ジョブのコールバック型 */
+type CronCallback = () => void | Promise<void>;
+
 export class CronScheduler {
+  private readonly extraJobs: { label: string; check: (now: Date) => boolean; callback: CronCallback }[] = [];
+
   constructor(private readonly queue: TaskQueue) {}
+
+  /** カスタム Cron ジョブを登録する */
+  registerJob(label: string, check: (now: Date) => boolean, callback: CronCallback): void {
+    this.extraJobs.push({ label, check, callback });
+  }
 
   checkAndCreateTasks(now: Date): void {
     const hour = now.getHours();
@@ -44,6 +54,15 @@ export class CronScheduler {
           priority: 7,
           dependsOn: null,
           parentTaskId: null,
+        });
+      }
+    }
+
+    // カスタム Cron ジョブの実行
+    for (const job of this.extraJobs) {
+      if (job.check(now)) {
+        void Promise.resolve(job.callback()).catch(() => {
+          // non-critical
         });
       }
     }
