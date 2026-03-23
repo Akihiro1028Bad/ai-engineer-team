@@ -149,8 +149,8 @@ export class TaskQueue {
         .run(status, data?.result ?? null, data?.costUsd ?? 0, data?.turnsUsed ?? 0, now, id);
     } else if (status === "awaiting_approval") {
       this.db
-        .prepare("UPDATE tasks SET status = ?, approval_pr_url = ? WHERE id = ?")
-        .run(status, data?.approvalPrUrl ?? null, id);
+        .prepare("UPDATE tasks SET status = ?, approval_pr_url = ?, result = ?, cost_usd = ?, turns_used = ? WHERE id = ?")
+        .run(status, data?.approvalPrUrl ?? null, data?.result ?? null, data?.costUsd ?? 0, data?.turnsUsed ?? 0, id);
     } else if (status === "ci_checking") {
       this.db
         .prepare("UPDATE tasks SET status = ?, pr_number = ? WHERE id = ?")

@@ -164,14 +164,35 @@ export class Classifier {
     };
   }
 
-  /** Haiku で Issue のスコープを分析し、分割すべきか判定する */
+  /** Opus で Issue のスコープを分析し、分割すべきか判定する */
   private async analyzeScope(
     issue: Issue,
   ): Promise<{ title: string; description: string }[]> {
     try {
       const { query } = await import("@anthropic-ai/claude-agent-sdk");
 
+      // JSON Schema を直接定義（Zod v3 では toJSONSchema が未サポート）
+      const jsonSchema = {
+        type: "object" as const,
+        properties: {
+          isLarge: { type: "boolean" as const },
+          scopes: {
+            type: "array" as const,
+            items: {
+              type: "object" as const,
+              properties: {
+                title: { type: "string" as const },
+                description: { type: "string" as const },
+              },
+              required: ["title", "description"],
+            },
+          },
+        },
+        required: ["isLarge", "scopes"],
+      };
+
       let structuredOutput: unknown = null;
+      let resultText: string | undefined;
 
       for await (const message of query({
         prompt: [
@@ -184,11 +205,7 @@ export class Classifier {
           "- 変更対象が1〜2ファイルの小さなタスク → isLarge: false, scopes: []",
           "- 変更対象が3ファイル以上、または複数画面/コンポーネントにまたがる → isLarge: true",
           "- 大規模な場合、画面/コンポーネント/機能ごとにスコープを分割する",
-          "",
-          "JSON形式で回答してください:",
-          '{ "isLarge": boolean, "scopes": [{ "title": "スコープ名", "description": "このスコープで行う変更の説明" }] }',
-          "",
-          "isLarge が false の場合、scopes は空配列 [] にしてください。",
+          "- 各スコープは独立して実装可能な単位にする",
         ].join("\n"),
         options: {
           model: "opus",
@@ -196,32 +213,48 @@ export class Classifier {
           maxBudgetUsd: 0.50,
           allowedTools: [],
           permissionMode: "dontAsk",
+          outputFormat: { type: "json_schema", schema: jsonSchema },
         },
       }) as AsyncIterable<{ type: string; structured_output?: unknown; result?: string }>) {
         if (message.type === "result") {
           structuredOutput = message.structured_output;
-          // structured_output がない場合は result から JSON を抽出
-          if (!structuredOutput && message.result) {
-            const jsonMatch = /\{[\s\S]*\}/.exec(message.result);
-            if (jsonMatch) {
-              try {
-                structuredOutput = JSON.parse(jsonMatch[0]) as unknown;
-              } catch {
-                // パース失敗
-              }
-            }
+          resultText = message.result;
+        }
+      }
+
+      // 構造化出力がなければテキストから JSON 抽出を試みる
+      if (!structuredOutput && resultText) {
+        const jsonMatch = /\{[\s\S]*\}/.exec(resultText);
+        if (jsonMatch) {
+          try {
+            structuredOutput = JSON.parse(jsonMatch[0]) as unknown;
+          } catch {
+            console.error("[Classifier] Failed to parse JSON from result text");
           }
         }
       }
 
-      if (!structuredOutput) return [];
+      if (!structuredOutput) {
+        console.warn("[Classifier] No structured output from Opus scope analysis");
+        return [];
+      }
 
       const parsed = ScopeAnalysisSchema.safeParse(structuredOutput);
-      if (!parsed.success || !parsed.data.isLarge) return [];
+      if (!parsed.success) {
+        console.warn("[Classifier] Scope analysis schema validation failed:", parsed.error.message);
+        return [];
+      }
 
+      if (!parsed.data.isLarge) {
+        console.info("[Classifier] Issue classified as small scope");
+        return [];
+      }
+
+      console.info(`[Classifier] Issue split into ${parsed.data.scopes.length} scopes`);
       return parsed.data.scopes;
-    } catch {
-      // Haiku 分析失敗 → 単一パイプラインにフォールバック
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : "Unknown error";
+      console.error("[Classifier] Opus scope analysis failed:", msg);
       return [];
     }
   }

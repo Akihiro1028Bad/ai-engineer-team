@@ -117,9 +117,16 @@ export class GitHubPoller {
           });
 
           for (const comment of comments) {
-            // bot のコメントは無視
-            if (comment.body.includes("🤖")) continue;
-            if (comment.body.includes("@claude")) continue;
+            // --- bot フィルタ（ユーザー名ベース） ---
+            const login = comment.user?.login?.toLowerCase() ?? "";
+            const BOT_LOGINS = ["vercel", "github-actions", "dependabot", "renovate"];
+            const isBot = login.includes("bot") || login.includes("[bot]") || BOT_LOGINS.includes(login);
+            if (isBot) continue;
+
+            // --- コンテンツフィルタ ---
+            if (comment.body.includes("🤖")) continue;           // AI Agent Orchestrator 自身
+            if (comment.body.startsWith("@claude")) continue;    // Claude Code コマンド
+            if (comment.body.startsWith("[vc]:")) continue;      // Vercel プレビュー
 
             // 既に処理済みか確認
             const commentSource = `github_comment:${issue.number}:${comment.body.slice(0, 50)}`;
