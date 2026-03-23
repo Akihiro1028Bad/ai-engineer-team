@@ -675,6 +675,18 @@ export class Orchestrator {
         }
       }
 
+      // 実装系タスクで pushed: false の場合はリトライ
+      const isImplementation = ["fixer", "builder"].includes(config.role);
+      if (isImplementation && !result.pushed && task.retryCount < 2) {
+        logger.warn({ taskId, agent: config.role, retryCount: task.retryCount }, "Implementation produced no changes — retrying");
+        queue.updateStatus(taskId, "pending", {
+          result: result.result,
+          costUsd: result.costUsd,
+          turnsUsed: result.turnsUsed,
+        });
+        return;
+      }
+
       // PR 作成フロー
       const collector = this.findCollectorForTask(task.id);
       if (result.pushed && result.branch && collector) {

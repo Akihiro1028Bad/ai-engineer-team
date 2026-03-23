@@ -106,7 +106,10 @@ export class Dispatcher {
           maxTurns: config.maxTurns,
           maxBudgetUsd: config.maxBudgetUsd,
           model: config.model,
-          systemPrompt: systemPrompt || undefined,
+          systemPrompt: systemPrompt
+            ? { type: "preset" as const, preset: "claude_code" as const, append: systemPrompt }
+            : { type: "preset" as const, preset: "claude_code" as const },
+          settingSources: ["project"],
           cwd,
         },
       }) as AsyncIterable<{ type: string } & Record<string, unknown>>) {

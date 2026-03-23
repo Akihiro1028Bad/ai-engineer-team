@@ -155,7 +155,10 @@ export class AgentRunner {
           maxTurns: config.maxTurns,
           maxBudgetUsd: config.maxBudgetUsd,
           model: node.model,
-          systemPrompt: config.systemPrompt || undefined,
+          systemPrompt: config.systemPrompt
+            ? { type: "preset" as const, preset: "claude_code" as const, append: config.systemPrompt }
+            : { type: "preset" as const, preset: "claude_code" as const },
+          settingSources: ["project"],
           cwd,
         },
       }) as AsyncIterable<{ type: string } & Record<string, unknown>>) {
