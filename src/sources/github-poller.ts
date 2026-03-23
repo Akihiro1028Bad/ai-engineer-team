@@ -29,6 +29,14 @@ interface OctokitLike {
       issue_number: number;
     }) => Promise<{ data: { body: string; user: { login: string } | null }[] }>;
   };
+  reactions: {
+    createForIssue: (params: {
+      owner: string;
+      repo: string;
+      issue_number: number;
+      content: string;
+    }) => Promise<unknown>;
+  };
   pulls: {
     listReviews: (params: {
       owner: string;
@@ -53,6 +61,24 @@ export class GitHubPoller {
     private readonly repo: string,
   ) {
     this.classifier = new Classifier(octokit, owner, repo);
+  }
+
+  /** Issue にリアクション（スタンプ）を付ける */
+  async reactToIssue(taskId: string, reaction: "eyes" | "rocket" | "+1" | "-1" | "confused" | "heart"): Promise<void> {
+    const match = /^gh-(\d+)/.exec(taskId);
+    if (!match) return;
+    const issueNumber = Number(match[1]);
+
+    try {
+      await this.octokit.reactions.createForIssue({
+        owner: this.owner,
+        repo: this.repo,
+        issue_number: issueNumber,
+        content: reaction,
+      });
+    } catch {
+      // リアクション失敗は非致命的
+    }
   }
 
   /** Issue に PR リンク通知をコメント投稿する */
@@ -95,6 +121,16 @@ export class GitHubPoller {
           body: issue.body ?? "",
           labels,
         });
+
+        // 👀 Issue 検出リアクション
+        try {
+          await this.octokit.reactions.createForIssue({
+            owner: this.owner,
+            repo: this.repo,
+            issue_number: issue.number,
+            content: "eyes",
+          });
+        } catch { /* non-critical */ }
 
         // 各スコープごとに独立パイプラインを作成
         for (const { scopeId, classification } of result.pipelines) {

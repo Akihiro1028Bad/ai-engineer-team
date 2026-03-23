@@ -100,6 +100,11 @@ export class Orchestrator {
       this.activeTasks += 1;
       logger.info({ taskId: task.id, agent: config.role }, "Dispatching task");
 
+      // 👀 処理開始リアクション
+      if (this.deps.githubPoller) {
+        void this.deps.githubPoller.reactToIssue(task.id, "eyes");
+      }
+
       void this.executeTask(task.id, config).finally(() => {
         this.activeTasks -= 1;
       });
@@ -189,6 +194,11 @@ export class Orchestrator {
       });
 
       logger.info({ taskId, cost: result.costUsd, turns: result.turnsUsed, pushed: result.pushed }, "Task completed");
+
+      // 🚀 完了リアクション
+      if (this.deps.githubPoller) {
+        void this.deps.githubPoller.reactToIssue(taskId, "rocket");
+      }
     } else {
       // 失敗
       circuitBreaker.recordFailure();
@@ -214,6 +224,12 @@ export class Orchestrator {
       }
 
       logger.warn({ taskId, error: result.error }, "Task failed");
+
+      // 😕 失敗リアクション（最終失敗時のみ）
+      const failedTask = queue.getById(taskId);
+      if (failedTask?.status === "failed" && this.deps.githubPoller) {
+        void this.deps.githubPoller.reactToIssue(taskId, "confused");
+      }
     }
   }
 
