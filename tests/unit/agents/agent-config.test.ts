@@ -6,8 +6,8 @@ describe("getAgentConfig", () => {
     const config = getAgentConfig("reviewer");
     expect(config.allowedTools).toEqual(["Read", "Glob", "Grep"]);
     expect(config.permissionMode).toBe("dontAsk");
-    expect(config.maxTurns).toBe(15);
-    expect(config.maxBudgetUsd).toBe(0.5);
+    expect(config.maxTurns).toBe(30);
+    expect(config.maxBudgetUsd).toBe(1.0);
     expect(config.timeoutMs).toBe(600_000);
   });
 

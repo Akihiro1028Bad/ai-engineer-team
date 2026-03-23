@@ -18,6 +18,10 @@ const MIGRATIONS: Migration[] = [
 ];
 
 export function runMigrations(db: Database.Database): void {
+  // WAL must be set outside any transaction
+  db.pragma("journal_mode = WAL");
+  db.pragma("foreign_keys = ON");
+
   db.exec(`
     CREATE TABLE IF NOT EXISTS schema_version (
       version INTEGER PRIMARY KEY,

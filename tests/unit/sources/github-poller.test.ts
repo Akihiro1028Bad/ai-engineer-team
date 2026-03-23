@@ -55,11 +55,11 @@ describe("GitHubPoller", () => {
       expect(queue.getNext()).not.toBeNull();
     });
 
-    it("T-GHP-002: ignores issue without ai-task label", async () => {
+    it("T-GHP-002: processes issue even without ai-task label (all open issues)", async () => {
       const octokit = makeOctokitMock([makeIssue(43, ["bug"])]);
       const poller = new GitHubPoller(octokit as never, queue, "org", "repo");
       await poller.pollIssues();
-      expect(queue.getNext()).toBeNull();
+      expect(queue.getNext()).not.toBeNull(); // 全 open Issue を処理
     });
 
     it("T-GHP-003: ignores already processed issue", async () => {

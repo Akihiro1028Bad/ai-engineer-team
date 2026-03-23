@@ -1,8 +1,14 @@
 import type Database from "better-sqlite3";
 
 export function initSchema(db: Database.Database): void {
-  db.pragma("journal_mode = WAL");
-  db.pragma("foreign_keys = ON");
+  // Note: WAL and foreign_keys are set in runMigrations() before transactions
+  // When called directly (e.g., tests), set them here too
+  try {
+    db.pragma("journal_mode = WAL");
+    db.pragma("foreign_keys = ON");
+  } catch {
+    // May fail inside a transaction — that's OK, caller handles it
+  }
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS tasks (

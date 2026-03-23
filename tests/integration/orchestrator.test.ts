@@ -8,6 +8,7 @@ import { RateController } from "../../src/safety/rate-controller.js";
 import { BudgetGuard } from "../../src/safety/budget-guard.js";
 import { SlackNotifier } from "../../src/notifications/slack-notifier.js";
 import { Dispatcher } from "../../src/agents/dispatcher.js";
+import { WorktreeManager } from "../../src/agents/worktree-manager.js";
 import { Orchestrator } from "../../src/orchestrator.js";
 import { createLogger } from "../../src/logging/logger.js";
 import { Writable } from "node:stream";
@@ -36,7 +37,10 @@ function createTestDeps() {
 
   return {
     queue,
-    dispatcher: new Dispatcher("/tmp/worktrees", "/tmp/handoffs"),
+    dispatcher: new Dispatcher(
+      new WorktreeManager("/tmp/worktrees", "/tmp/project", vi.fn().mockReturnValue(Buffer.from(""))),
+      "/tmp/handoffs",
+    ),
     cronScheduler: new CronScheduler(queue),
     circuitBreaker: new CircuitBreaker(5, 3_600_000),
     rateController: new RateController(false, 0, 150, 0.1),

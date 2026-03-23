@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Dispatcher } from "../../../src/agents/dispatcher.js";
+import { WorktreeManager } from "../../../src/agents/worktree-manager.js";
 import type { Task, AgentConfig } from "../../../src/types.js";
 
 // Mock Agent SDK
@@ -11,6 +12,12 @@ vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
     }
   }),
 }));
+
+function createMockWorktreeManager(): WorktreeManager {
+  const execMock = vi.fn().mockReturnValue(Buffer.from(""));
+  const wm = new WorktreeManager("/tmp/worktrees", "/tmp/project", execMock);
+  return wm;
+}
 
 function makeTask(overrides: Partial<Task> = {}): Task {
   return {
@@ -52,7 +59,7 @@ describe("Dispatcher", () => {
 
   beforeEach(() => {
     mockQueryResults.length = 0;
-    dispatcher = new Dispatcher("/home/user/worktrees", "/home/user/handoffs");
+    dispatcher = new Dispatcher(createMockWorktreeManager(), "/home/user/handoffs");
   });
 
   it("T-DSP-001: success result returns completed with metrics", async () => {
@@ -176,7 +183,7 @@ describe("Dispatcher", () => {
     await dispatcher.dispatch(makeTask(), reviewerConfig);
     const calls = vi.mocked(query).mock.calls;
     const opts = calls[calls.length - 1]![0] as { options?: { cwd?: string } };
-    expect(opts.options?.cwd).toBe("/home/user/worktrees/reviewer");
+    expect(opts.options?.cwd).toBe("/tmp/worktrees/reviewer");
   });
 
   it("T-DSP-013: single task returns completed (not awaiting_approval)", async () => {

@@ -31,6 +31,41 @@ export class WorktreeManager {
     return worktreePath;
   }
 
+  /** worktree 上に未コミットの変更があるかチェック */
+  hasDiff(role: AgentRole): boolean {
+    const worktreePath = join(this.worktreeDir, role);
+    try {
+      const result = this.exec(`git -C ${worktreePath} status --porcelain`);
+      return result.toString().trim().length > 0;
+    } catch {
+      return false;
+    }
+  }
+
+  /** worktree の変更を git add → commit → push する */
+  commitAndPush(role: AgentRole, taskId: string, message: string): boolean {
+    const worktreePath = join(this.worktreeDir, role);
+    const branch = `agent/${role}/${taskId}`;
+
+    try {
+      if (!this.hasDiff(role)) {
+        return false; // 変更なし
+      }
+
+      this.exec(`git -C ${worktreePath} add -A`);
+      this.exec(`git -C ${worktreePath} commit -m "${message.replace(/"/g, '\\"')}"`);
+      this.exec(`git -C ${worktreePath} push -u origin ${branch}`);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** ブランチ名を返す */
+  getBranchName(role: AgentRole, taskId: string): string {
+    return `agent/${role}/${taskId}`;
+  }
+
   cleanup(role: AgentRole, taskId: string): void {
     const branch = `agent/${role}/${taskId}`;
     const worktreePath = join(this.worktreeDir, role);
