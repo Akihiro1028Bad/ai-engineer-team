@@ -102,6 +102,14 @@ export class GitHubPoller {
   /** Issue・PR の全コメントを監視し、リアクション + 返信タスクを投入する */
   async pollAllComments(): Promise<void> {
     try {
+      // awaiting_approval の PR 番号を取得（これらは pollApprovals が担当）
+      const awaitingTasks = this.queue.getAwaitingApproval();
+      const awaitingPrNumbers = new Set(
+        awaitingTasks
+          .map((t) => t.approvalPrUrl ? this.extractPrNumber(t.approvalPrUrl) : null)
+          .filter((n): n is number => n !== null),
+      );
+
       const { data: issues } = await this.octokit.issues.listForRepo({
         owner: this.owner,
         repo: this.repo,
@@ -109,6 +117,9 @@ export class GitHubPoller {
       });
 
       for (const issue of issues) {
+        // awaiting_approval の PR はスキップ（pollApprovals が承認/却下を処理）
+        if (awaitingPrNumbers.has(issue.number)) continue;
+
         try {
           const { data: comments } = await this.octokit.issues.listComments({
             owner: this.owner,
@@ -271,8 +282,8 @@ export class GitHubPoller {
         const approvedByReview = reviews.some((r) => r.state === "APPROVED");
 
         // コメントによる承認も検出（自分の PR を自分で approve できないため）
-        let approvedByComment = false;
-        let rejectedByComment = false;
+        // 最後の人間コメントで承認/却下を判定
+        let lastHumanAction: "approve" | "reject" | null = null;
         try {
           const { data: comments } = await this.octokit.issues.listComments({
             owner: this.owner,
@@ -285,24 +296,33 @@ export class GitHubPoller {
           const botMarker = "🤖";
 
           for (const comment of comments) {
-            // bot のコメントは無視
+            // bot / GitHub App のコメントは無視
             if (comment.body.includes(botMarker)) continue;
+            if (comment.body.startsWith("[vc]:")) continue;        // Vercel
+            if (comment.body.startsWith("@claude")) continue;      // Claude コマンド
+            if (comment.body.startsWith("**Claude")) continue;     // Claude Code Review 結果
 
+            // user が null（GitHub App）のコメントは無視
+            const login = comment.user?.login?.toLowerCase() ?? "";
+            if (!login) continue;
+            const BOT_LOGINS = ["vercel", "github-actions", "dependabot", "renovate"];
+            if (login.includes("bot") || login.includes("[bot]") || BOT_LOGINS.includes(login)) continue;
+
+            // 人間のコメントのみ承認/却下を判定（最後のコメントが勝つ）
             const lower = comment.body.toLowerCase().trim();
-            if (APPROVE_KEYWORDS.some((kw) => lower.includes(kw))) {
-              approvedByComment = true;
-            }
             if (REJECT_KEYWORDS.some((kw) => lower.includes(kw))) {
-              rejectedByComment = true;
+              lastHumanAction = "reject";
+            } else if (APPROVE_KEYWORDS.some((kw) => lower.includes(kw))) {
+              lastHumanAction = "approve";
             }
           }
         } catch {
           // コメント取得失敗は非致命的
         }
 
-        if (rejectedByComment) {
+        if (lastHumanAction === "reject") {
           this.queue.rejectTask(task.id);
-        } else if (approvedByReview || approvedByComment) {
+        } else if (approvedByReview || lastHumanAction === "approve") {
           this.queue.approveTask(task.id);
         }
       } catch {
