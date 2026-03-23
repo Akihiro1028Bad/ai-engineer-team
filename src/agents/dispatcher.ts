@@ -1,9 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { query } from "@anthropic-ai/claude-agent-sdk";
-import type { Task, AgentConfig, TaskType } from "../types.js";
+import type { Task, AgentConfig } from "../types.js";
 import type { WorktreeManager } from "./worktree-manager.js";
-import { taskTypeToRole } from "./role-mapping.js";
 
 interface ResultMessage {
   type: "result";
@@ -43,18 +42,17 @@ export class Dispatcher {
   ) {}
 
   async dispatch(task: Task, config: AgentConfig, existingBranch?: string): Promise<DispatchResult> {
-    const role = taskTypeToRole(task.taskType as TaskType);
-
-    // 既存ブランチが指定されていればそのブランチを使う（設計→実装の同一ブランチ）
+    // Per-Task worktree: taskId ベースで worktree を作成/再利用
     let cwd: string;
     let branch: string;
     if (existingBranch) {
-      // Reviewer の worktree 上で既存ブランチに切り替え
-      cwd = this.worktreeManager.prepareExistingBranch(role, existingBranch);
+      // 設計→実装の同一ブランチ再利用（依存先タスクの worktree に入る）
+      const depTaskId = task.dependsOn ?? task.id;
+      cwd = this.worktreeManager.prepareExistingBranch(depTaskId, existingBranch);
       branch = existingBranch;
     } else {
-      cwd = this.worktreeManager.prepare(role, task.id);
-      branch = this.worktreeManager.getBranchName(role, task.id);
+      cwd = this.worktreeManager.prepare(task.id);
+      branch = this.worktreeManager.getBranchName(task.id);
     }
 
     // Fixer/Builder の場合: design.md を読んでプロンプトに追加
@@ -62,11 +60,9 @@ export class Dispatcher {
     const issueNumber = extractIssueNumber(task.id);
 
     if (task.taskType !== "review" && issueNumber) {
-      // 設計書パスを探索（単一スコープ or 複数スコープ）
       const candidates = [
         join(cwd, `specs/issue-${issueNumber}/design.md`),
       ];
-      // task description からスコープパスを抽出
       const scopeMatch = /specs\/issue-\d+\/([^/]+)\/design\.md/.exec(task.description);
       if (scopeMatch) {
         candidates.unshift(join(cwd, `specs/issue-${issueNumber}/${scopeMatch[1]}/design.md`));
@@ -88,7 +84,6 @@ export class Dispatcher {
 
     // Reviewer の場合: Issue 番号をプロンプトに埋め込む
     if (task.taskType === "review" && issueNumber && config.systemPrompt) {
-      // systemPrompt 内の {ISSUE_NUMBER} を実際の番号に置換
       prompt = [
         `Issue番号: #${issueNumber}`,
         `設計書の出力先: specs/issue-${issueNumber}/design.md`,
@@ -129,10 +124,9 @@ export class Dispatcher {
       }
 
       if (resultMsg.subtype === "success") {
-        // Reviewer の場合: design.md の存在を検証（単一スコープ + マルチスコープ両対応）
+        // Reviewer の場合: design.md の存在を検証
         let designFilePath: string | undefined;
         if (task.taskType === "review" && issueNumber) {
-          // task description からスコープパスを抽出（マルチスコープ対応）
           const scopeMatch = /specs\/issue-\d+\/([^/]+)\/design\.md/.exec(task.description);
           const designCandidates = scopeMatch
             ? [
@@ -152,7 +146,7 @@ export class Dispatcher {
         const commitMessage = task.taskType === "review"
           ? `design: ${task.title} (#${issueNumber ?? task.id})`
           : `${task.taskType}: ${task.title} (#${issueNumber ?? task.id})`;
-        const pushed = this.worktreeManager.commitAndPush(role, task.id, commitMessage);
+        const pushed = this.worktreeManager.commitAndPush(task.id, commitMessage);
 
         return {
           status: "completed",

@@ -195,7 +195,8 @@ export class PRReviewResponder {
       "3. 最小限の変更に留めてください",
     ].filter(Boolean).join("\n");
 
-    const cwd = this.worktreeManager.prepareExistingBranch("implementer" as "fixer", branch);
+    const taskId = `pr-review-${prNumber}`;
+    const cwd = this.worktreeManager.prepareExistingBranch(taskId, branch);
 
     for await (const message of query({
       prompt,
@@ -214,7 +215,7 @@ export class PRReviewResponder {
 
     // コミット＆プッシュ
     const commitMessage = `fix: address review comment on ${item.comment.path ?? "PR"} (#${prNumber})`;
-    this.worktreeManager.commitAndPush("fixer", `pr-${prNumber}`, commitMessage);
+    this.worktreeManager.commitAndPush(`pr-review-${prNumber}`, commitMessage);
 
     // 対応済みコメント
     await this.octokit.issues.createComment({

@@ -89,11 +89,7 @@ export class AgentRunner {
         // コミット＆プッシュ（実装系エージェントの場合）
         if (this.shouldCommit(node.agentRole)) {
           const commitMessage = `${node.agentRole}: ${taskId} node ${node.id}`;
-          const pushed = this.worktreeManager.commitAndPush(
-            node.agentRole as "reviewer" | "fixer" | "builder" | "scribe",
-            taskId,
-            commitMessage,
-          );
+          const pushed = this.worktreeManager.commitAndPush(taskId, commitMessage);
           result.pushed = pushed;
         }
 

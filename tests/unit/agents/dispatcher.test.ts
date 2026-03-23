@@ -185,7 +185,7 @@ describe("Dispatcher", () => {
     await dispatcher.dispatch(makeTask(), reviewerConfig);
     const calls = vi.mocked(query).mock.calls;
     const opts = calls[calls.length - 1]![0] as { options?: { cwd?: string } };
-    expect(opts.options?.cwd).toBe("/tmp/worktrees/reviewer");
+    expect(opts.options?.cwd).toBe("/tmp/worktrees/test-001");
   });
 
   it("T-DSP-013: single task returns completed (not awaiting_approval)", async () => {
