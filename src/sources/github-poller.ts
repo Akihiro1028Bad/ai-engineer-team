@@ -300,8 +300,9 @@ export class GitHubPoller {
         const approvedByReview = reviews.some((r) => r.state === "APPROVED");
 
         // コメントによる承認も検出（自分の PR を自分で approve できないため）
-        // 最後の人間コメントで承認/却下を判定
-        let lastHumanAction: "approve" | "reject" | null = null;
+        // 最後の人間コメントで判定: 「承認」「却下」またはフィードバック
+        let lastHumanAction: "approve" | "reject" | "feedback" | null = null;
+        let lastFeedbackComment = "";
         try {
           // Issue/PR コメント + PR レビューコメントの両方を取得
           const { data: issueComments } = await this.octokit.issues.listComments({
@@ -321,30 +322,33 @@ export class GitHubPoller {
 
           const allComments = [...issueComments, ...reviewComments];
 
-          const APPROVE_KEYWORDS = ["承認", "lgtm", "approve", "approved", "ok", "実装開始", "進めてください", "大丈夫", "問題ない", "いいと思います", "良いと思います", "お願いします", "進めて"];
-          const REJECT_KEYWORDS = ["却下", "reject", "やり直し", "修正してください"];
           const botMarker = "🤖";
+          const humanComments: string[] = [];
 
           for (const comment of allComments) {
             // bot / GitHub App のコメントは無視
             if (comment.body.includes(botMarker)) continue;
-            if (comment.body.startsWith("[vc]:")) continue;        // Vercel
-            if (comment.body.startsWith("@claude")) continue;      // Claude コマンド
-            if (comment.body.startsWith("**Claude")) continue;     // Claude Code Review 結果
+            if (comment.body.startsWith("[vc]:")) continue;
+            if (comment.body.startsWith("@claude")) continue;
+            if (comment.body.startsWith("**Claude")) continue;
 
-            // user が null（GitHub App）のコメントは無視
             const login = comment.user?.login?.toLowerCase() ?? "";
             if (!login) continue;
             const BOT_LOGINS = ["vercel", "github-actions", "dependabot", "renovate"];
             if (login.includes("bot") || login.includes("[bot]") || BOT_LOGINS.includes(login)) continue;
 
-            // 人間のコメントのみ承認/却下を判定（最後のコメントが勝つ）
-            const lower = comment.body.toLowerCase().trim();
-            if (REJECT_KEYWORDS.some((kw) => lower.includes(kw))) {
-              lastHumanAction = "reject";
-            } else if (APPROVE_KEYWORDS.some((kw) => lower.includes(kw))) {
-              lastHumanAction = "approve";
-            }
+            humanComments.push(comment.body.trim());
+          }
+
+          // 最後の人間コメントで判定
+          const lastComment = humanComments.length > 0 ? humanComments[humanComments.length - 1]! : "";
+          if (lastComment === "承認") {
+            lastHumanAction = "approve";
+          } else if (lastComment === "却下") {
+            lastHumanAction = "reject";
+          } else if (lastComment.length > 0) {
+            lastHumanAction = "feedback";
+            lastFeedbackComment = lastComment;
           }
         } catch {
           // コメント取得失敗は非致命的
@@ -354,11 +358,67 @@ export class GitHubPoller {
           this.queue.rejectTask(task.id);
         } else if (approvedByReview || lastHumanAction === "approve") {
           this.queue.approveTask(task.id);
+        } else if (lastHumanAction === "feedback" && lastFeedbackComment) {
+          // フィードバック → Reviewer が設計書を修正して再コミット
+          await this.handleDesignFeedback(task.id, prNumber, lastFeedbackComment);
         }
       } catch {
         // PR API エラーはログのみ
       }
     }
+  }
+
+  /** フィードバックに基づいて設計書を修正するタスクを投入する */
+  private async handleDesignFeedback(taskId: string, prNumber: number, feedback: string): Promise<void> {
+    const feedbackSource = `design_feedback:${taskId}:${feedback.slice(0, 50)}`;
+    if (this.queue.isDuplicate(feedbackSource)) return;
+
+    // PR のブランチ名を取得
+    let prBranch = "";
+    try {
+      const { data: pr } = await this.octokit.pulls.get({
+        owner: this.owner,
+        repo: this.repo,
+        pull_number: prNumber,
+      });
+      prBranch = (pr as unknown as { head: { ref: string } }).head.ref;
+    } catch { /* non-critical */ }
+
+    // 設計書修正タスクを投入（Reviewer/Opus が修正）
+    this.queue.push({
+      id: `${taskId}-feedback-${Date.now()}`,
+      taskType: "review",
+      title: `[設計修正] PR #${prNumber} のフィードバック対応`,
+      description: [
+        `PR #${prNumber} の設計書に対してフィードバックがありました。設計書を修正してください。`,
+        "",
+        prBranch ? `**既存ブランチ**: \`${prBranch}\`（このブランチ上で修正してください）` : "",
+        "",
+        "## フィードバック内容",
+        feedback,
+        "",
+        "## 指示",
+        "1. 既存の design.md を読む",
+        "2. フィードバックの内容を反映して design.md を更新する",
+        "3. 修正内容をコミットする",
+        "",
+        "新しいファイルは作成せず、既存の design.md を直接修正してください。",
+      ].join("\n"),
+      source: feedbackSource,
+      priority: 2,
+      dependsOn: null,
+      parentTaskId: null,
+    });
+
+    // PR にリアクション
+    try {
+      await this.octokit.reactions.createForIssue({
+        owner: this.owner,
+        repo: this.repo,
+        issue_number: prNumber,
+        content: "eyes",
+      });
+    } catch { /* non-critical */ }
   }
 
   private extractPrNumber(url: string): number | null {
