@@ -20,6 +20,8 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     parentTaskId: null,
     contextFile: null,
     approvalPrUrl: null,
+    prNumber: null,
+    ciFixCount: 0,
     createdAt: new Date().toISOString(),
     startedAt: new Date().toISOString(),
     completedAt: new Date().toISOString(),

@@ -123,9 +123,11 @@ describe("Classifier", () => {
     });
 
     const result = await classifier.classify(makeIssue({ number: 22 }));
-    if (result.pipelines[0]!.classification.complexity === "pipeline") {
-      expect(result.pipelines[0]!.classification.subTasks[0]!.description).toContain("scope-1/design.md");
-      expect(result.pipelines[1]!.classification.subTasks[0]!.description).toContain("scope-2/design.md");
+    const cls0 = result.pipelines[0]!.classification;
+    const cls1 = result.pipelines[1]!.classification;
+    if (cls0.complexity === "pipeline" && cls1.complexity === "pipeline") {
+      expect(cls0.subTasks[0]!.description).toContain("scope-1/design.md");
+      expect(cls1.subTasks[0]!.description).toContain("scope-2/design.md");
     }
   });
 });

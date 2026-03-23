@@ -1,0 +1,20 @@
+[
+  {
+    "id": "frontend",
+    "githubRepo": "your-org/frontend-app",
+    "projectDir": "/home/user/projects/frontend-app",
+    "worktreeDir": "/home/user/worktrees/frontend",
+    "enabled": true,
+    "dailyBudgetUsd": 10.0,
+    "maxConcurrent": 1
+  },
+  {
+    "id": "backend",
+    "githubRepo": "your-org/backend-api",
+    "projectDir": "/home/user/projects/backend-api",
+    "worktreeDir": "/home/user/worktrees/backend",
+    "enabled": true,
+    "dailyBudgetUsd": 10.0,
+    "maxConcurrent": 1
+  }
+]
