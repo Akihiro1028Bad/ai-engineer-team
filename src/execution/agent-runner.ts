@@ -146,21 +146,26 @@ export class AgentRunner {
 
     let resultMsg: ResultMessage | null = null;
 
-    for await (const message of query({
-      prompt,
-      options: {
-        allowedTools: [...config.allowedTools],
-        permissionMode: config.permissionMode,
-        maxTurns: config.maxTurns,
-        maxBudgetUsd: config.maxBudgetUsd,
-        model: node.model,
-        systemPrompt: config.systemPrompt || undefined,
-        cwd,
-      },
-    }) as AsyncIterable<{ type: string } & Record<string, unknown>>) {
-      if (message.type === "result") {
-        resultMsg = message as unknown as ResultMessage;
+    try {
+      for await (const message of query({
+        prompt,
+        options: {
+          allowedTools: [...config.allowedTools],
+          permissionMode: config.permissionMode,
+          maxTurns: config.maxTurns,
+          maxBudgetUsd: config.maxBudgetUsd,
+          model: node.model,
+          systemPrompt: config.systemPrompt || undefined,
+          cwd,
+        },
+      }) as AsyncIterable<{ type: string } & Record<string, unknown>>) {
+        if (message.type === "result") {
+          resultMsg = message as unknown as ResultMessage;
+        }
       }
+    } catch {
+      // Agent SDK がプロセス終了時に exit code 1 を投げることがある。
+      // resultMsg が既に取得済みなら無視して続行する。
     }
 
     if (!resultMsg) {

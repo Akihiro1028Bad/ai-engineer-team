@@ -205,20 +205,21 @@ export class TaskQueue {
 
   recoverFromCrash(): void {
     const recover = this.db.transaction(() => {
-      // First: mark tasks that would exceed retry limit as failed directly
+      // Mark tasks that would exceed retry limit as failed
       this.db.exec(`
         UPDATE tasks
         SET status = 'failed'
-        WHERE status = 'in_progress' AND retry_count >= 3
+        WHERE status IN ('in_progress', 'planning', 'validating') AND retry_count >= 3
       `);
 
-      // Then: reset remaining in_progress → pending with retry+1
+      // Reset remaining stuck tasks → pending with retry+1
+      // Note: awaiting_approval is NOT reset (it's a valid long-lived state)
       this.db.exec(`
         UPDATE tasks
         SET status = 'pending',
             retry_count = retry_count + 1,
             started_at = NULL
-        WHERE status = 'in_progress'
+        WHERE status IN ('in_progress', 'planning', 'validating')
       `);
     });
     recover();

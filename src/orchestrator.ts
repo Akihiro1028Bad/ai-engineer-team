@@ -194,21 +194,14 @@ export class Orchestrator {
     }
 
     // awaiting_approval タスクの承認チェック（1 tick につき 1 回ずつ）
-    if (this.deps.enableV3Planning) {
-      const awaitingTasks = queue.getByStatus("awaiting_approval");
-      for (const awaitingTask of awaitingTasks) {
-        const approved = await this.checkApprovalOnce(awaitingTask.id);
-        if (approved) {
-          logger.info({ taskId: awaitingTask.id }, "Design approved — resuming DAG execution");
-          queue.updateStatus(awaitingTask.id, "in_progress");
-          this.deps.statusEmitter?.emitProgress(awaitingTask.id, "設計が承認されました。実装を開始します。");
-
-          // Resume the v3 flow for this task
-          this.activeTasks += 1;
-          void this.executeV3Flow(awaitingTask.id).finally(() => {
-            this.activeTasks -= 1;
-          });
-        }
+    const awaitingTasks = queue.getByStatus("awaiting_approval");
+    for (const awaitingTask of awaitingTasks) {
+      const approved = await this.checkApprovalOnce(awaitingTask.id);
+      if (approved) {
+        logger.info({ taskId: awaitingTask.id }, "Design approved — resuming execution");
+        // 承認された review タスクを completed にして、依存する次タスク（fixer/builder）を解放
+        queue.updateStatus(awaitingTask.id, "completed");
+        this.deps.statusEmitter?.emitProgress(awaitingTask.id, "設計が承認されました。次のタスクを開始します。");
       }
     }
 

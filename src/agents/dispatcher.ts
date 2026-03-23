@@ -95,9 +95,9 @@ export class Dispatcher {
       ? config.systemPrompt.replaceAll("{ISSUE_NUMBER}", issueNumber)
       : config.systemPrompt;
 
-    try {
-      let resultMsg: ResultMessage | null = null;
+    let resultMsg: ResultMessage | null = null;
 
+    try {
       for await (const message of query({
         prompt,
         options: {
@@ -169,6 +169,26 @@ export class Dispatcher {
         pushed: false,
       };
     } catch (error: unknown) {
+      // Agent SDK はプロセス終了時に exit code 1 を投げることがある。
+      // result メッセージが既に取得済みなら成功として処理する。
+      if (resultMsg?.subtype === "success") {
+        const commitMessage = task.taskType === "review"
+          ? `design: ${task.title} (#${issueNumber ?? task.id})`
+          : `${task.taskType}: ${task.title} (#${issueNumber ?? task.id})`;
+        const pushed = this.worktreeManager.hasDiff(task.id)
+          ? this.worktreeManager.commitAndPush(task.id, commitMessage)
+          : false;
+        return {
+          status: "completed",
+          costUsd: resultMsg.total_cost_usd,
+          turnsUsed: resultMsg.num_turns,
+          durationMs: resultMsg.duration_ms,
+          result: resultMsg.result,
+          structuredOutput: resultMsg.structured_output,
+          pushed,
+          branch: pushed ? branch : undefined,
+        };
+      }
       const message = error instanceof Error ? error.message : "Unknown error";
       return {
         status: "retry", costUsd: 0, turnsUsed: 0, durationMs: 0,

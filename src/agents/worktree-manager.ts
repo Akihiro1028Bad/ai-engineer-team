@@ -69,40 +69,56 @@ export class WorktreeManager {
   }
 
   /**
-   * 既存ブランチを worktree にチェックアウトする。
-   * 設計→実装で同一ブランチを再利用する場合に使用。
+   * 既存ブランチをベースに新しい worktree を作成する（設計→実装の引き継ぎ用）。
+   * Git の制約: 1ブランチは1 worktree にしかチェックアウトできない。
+   * そのため taskId 固有のブランチ agent/{taskId} を baseBranch から派生させる。
    */
-  prepareExistingBranch(taskId: string, branch: string): string {
+  prepareExistingBranch(taskId: string, baseBranch: string): string {
     const worktreePath = this.getWorktreePath(taskId);
+    const newBranch = this.getBranchName(taskId);
 
     // リモートの最新を取得
     try {
-      this.exec("git", ["-C", this.projectDir, "fetch", "origin", branch]);
+      this.exec("git", ["-C", this.projectDir, "fetch", "origin", baseBranch]);
     } catch { /* ignore */ }
 
-    // 既存 worktree があればそのままブランチ切り替え
-    try {
-      this.exec("git", ["-C", worktreePath, "checkout", branch]);
+    // 既存 worktree があればそのまま使う
+    if (existsSync(worktreePath)) {
       try {
-        this.exec("git", ["-C", worktreePath, "pull", "origin", branch]);
-      } catch { /* pull failure is non-fatal */ }
-      return worktreePath;
-    } catch { /* worktree が存在しない or チェックアウト失敗 */ }
+        this.exec("git", ["-C", worktreePath, "rev-parse", "--git-dir"]);
+        return worktreePath;
+      } catch { /* stale directory */ }
+    }
 
-    // worktree を新規作成してブランチをチェックアウト
+    // 掃除
     try {
       this.exec("git", ["-C", this.projectDir, "worktree", "remove", worktreePath, "--force"]);
     } catch { /* ignore */ }
+    try {
+      this.exec("git", ["-C", this.projectDir, "worktree", "prune"]);
+    } catch { /* ignore */ }
+    try {
+      rmSync(worktreePath, { recursive: true, force: true });
+    } catch { /* ignore */ }
+
+    // 古いブランチがあれば削除
+    try {
+      this.exec("git", ["-C", this.projectDir, "branch", "-D", newBranch]);
+    } catch { /* ignore */ }
+
+    // baseBranch をベースに新しいブランチで worktree を作成
+    let base = baseBranch;
+    try {
+      this.exec("git", ["-C", this.projectDir, "rev-parse", "--verify", baseBranch]);
+    } catch {
+      base = `origin/${baseBranch}`;
+    }
 
     try {
-      this.exec("git", ["-C", this.projectDir, "worktree", "add", worktreePath, branch]);
-    } catch {
-      try {
-        this.exec("git", ["-C", this.projectDir, "worktree", "add", worktreePath, "-b", branch, `origin/${branch}`]);
-      } catch {
-        // フォールバック: 新規ブランチとして作成
-        this.exec("git", ["-C", this.projectDir, "worktree", "add", worktreePath, "-b", branch, "origin/main"]);
-      }
+      this.exec("git", ["-C", this.projectDir, "worktree", "add", worktreePath, "-b", newBranch, base]);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to create worktree for ${newBranch} from ${baseBranch}: ${msg}`);
     }
 
     return worktreePath;
