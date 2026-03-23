@@ -81,8 +81,13 @@ export class Dispatcher {
       }
     }
 
+    // システムプロンプトの内容をプロンプト本文に埋め込む（確実にエージェントが読むように）
+    const resolvedSystemPrompt = issueNumber
+      ? config.systemPrompt.replaceAll("{ISSUE_NUMBER}", issueNumber)
+      : config.systemPrompt;
+
     // Reviewer の場合: Issue 番号をプロンプトに埋め込む
-    if (task.taskType === "review" && issueNumber && config.systemPrompt) {
+    if (task.taskType === "review" && issueNumber) {
       prompt = [
         `Issue番号: #${issueNumber}`,
         `設計書の出力先: specs/issue-${issueNumber}/design.md`,
@@ -91,9 +96,14 @@ export class Dispatcher {
       ].join("\n");
     }
 
-    const systemPrompt = issueNumber
-      ? config.systemPrompt.replaceAll("{ISSUE_NUMBER}", issueNumber)
-      : config.systemPrompt;
+    // エージェント指示をプロンプト本文の先頭に追加（systemPrompt append より確実）
+    prompt = [
+      "<agent_instructions>",
+      resolvedSystemPrompt,
+      "</agent_instructions>",
+      "",
+      prompt,
+    ].join("\n");
 
     let resultMsg: ResultMessage | null = null;
 
@@ -106,9 +116,7 @@ export class Dispatcher {
           maxTurns: config.maxTurns,
           maxBudgetUsd: config.maxBudgetUsd,
           model: config.model,
-          systemPrompt: systemPrompt
-            ? { type: "preset" as const, preset: "claude_code" as const, append: systemPrompt }
-            : { type: "preset" as const, preset: "claude_code" as const },
+          systemPrompt: { type: "preset" as const, preset: "claude_code" as const },
           settingSources: ["project"],
           cwd,
         },

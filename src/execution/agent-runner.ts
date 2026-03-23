@@ -67,8 +67,11 @@ export class AgentRunner {
     this.statusEmitter.emitNodeStarted(taskId, planId, node.id, node.agentRole);
     this.logger.info({ taskId, nodeId: node.id, agent: node.agentRole, model: node.model }, "Node execution started");
 
-    // プロンプト構築
+    // プロンプト構築（エージェント指示をプロンプト本文に埋め込む）
     let prompt = node.prompt;
+    if (config.systemPrompt) {
+      prompt = `<agent_instructions>\n${config.systemPrompt}\n</agent_instructions>\n\n${prompt}`;
+    }
     if (contextInsert) {
       prompt = `${contextInsert}\n\n---\n\n${prompt}`;
     }
@@ -155,9 +158,7 @@ export class AgentRunner {
           maxTurns: config.maxTurns,
           maxBudgetUsd: config.maxBudgetUsd,
           model: node.model,
-          systemPrompt: config.systemPrompt
-            ? { type: "preset" as const, preset: "claude_code" as const, append: config.systemPrompt }
-            : { type: "preset" as const, preset: "claude_code" as const },
+          systemPrompt: { type: "preset" as const, preset: "claude_code" as const },
           settingSources: ["project"],
           cwd,
         },
