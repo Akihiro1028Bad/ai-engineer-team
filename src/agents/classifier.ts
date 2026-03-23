@@ -177,7 +177,7 @@ export class Classifier {
 
       if (attempt < MAX_RETRIES - 1) {
         console.warn(`[Classifier] Scope analysis attempt ${attempt + 1} failed, retrying in ${BACKOFF_MS[attempt]}ms...`);
-        await new Promise((r) => setTimeout(r, BACKOFF_MS[attempt]!));
+        await new Promise((r) => setTimeout(r, BACKOFF_MS[attempt]));
       }
     }
 

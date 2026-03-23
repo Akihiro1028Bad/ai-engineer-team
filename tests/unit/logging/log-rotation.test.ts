@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, writeFileSync, existsSync, readdirSync, utimesSync, mkdirSync } from "node:fs";
+import { mkdtempSync, writeFileSync, existsSync, utimesSync } from "node:fs";
 import { rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -36,7 +36,7 @@ describe("rotateOldLogs", () => {
   });
 
   it("T-LR-003: handles empty directory", () => {
-    expect(() => rotateOldLogs(tmpDir, 30)).not.toThrow();
+    expect(() => { rotateOldLogs(tmpDir, 30); }).not.toThrow();
   });
 
   it("T-LR-004: ignores non-jsonl files", () => {
@@ -47,7 +47,7 @@ describe("rotateOldLogs", () => {
 
   it("T-LR-005: creates directory if it does not exist", () => {
     const missingDir = join(tmpDir, "sub", "logs");
-    expect(() => rotateOldLogs(missingDir, 30)).not.toThrow();
+    expect(() => { rotateOldLogs(missingDir, 30); }).not.toThrow();
     expect(existsSync(missingDir)).toBe(true);
   });
 });

@@ -74,14 +74,14 @@ export class GapDetector {
     if (!gapMatch) return null;
 
     try {
-      const reportContent = gapMatch[1]!;
+      const reportContent = gapMatch[1] ?? "";
       const descMatch = /description:\s*"([^"]+)"/.exec(reportContent);
       const catMatch = /category:\s*"([^"]+)"/.exec(reportContent);
 
       if (descMatch) {
         return {
           id: `gap-agent-${Date.now()}`,
-          description: descMatch[1]!,
+          description: descMatch[1] ?? "",
           detectedBy: "agent_report",
           category: catMatch?.[1] ?? "unknown",
           occurrences: 1,

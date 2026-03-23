@@ -54,7 +54,7 @@ describe("parseAndPush (manual-cli)", () => {
   it("T-CLI-006: accepts --depends-on", () => {
     // Create dependency first
     parseAndPush(["--type", "review", "--title", "Parent", "--description", "D"], queue);
-    const parent = queue.getNext()!;
+    const parent = queue.getNext() ?? { id: "fallback" };
     parseAndPush(
       ["--type", "fix", "--title", "Child", "--description", "D", "--depends-on", parent.id],
       queue,

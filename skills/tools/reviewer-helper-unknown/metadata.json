@@ -1,0 +1,11 @@
+{
+  "name": "reviewer-helper-unknown",
+  "description": "reviewer が \"unknown\" で 3 回失敗",
+  "safetyLevel": "read_only",
+  "version": 1,
+  "createdBy": "toolforge",
+  "createdAt": "2026-03-23T13:58:36.377Z",
+  "usageCount": 0,
+  "successRate": 0,
+  "approvalStatus": "approved"
+}

@@ -37,7 +37,7 @@ export class GeneratorCriticLoop {
   /** Critic Loop が必要かどうかを判定する */
   shouldRunCriticLoop(
     node: PlanNode,
-    result: NodeRunResult,
+    _result: NodeRunResult,
     changedFiles: string[],
   ): boolean {
     // ノード設定で明示的に要求

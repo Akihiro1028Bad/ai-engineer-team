@@ -7,6 +7,7 @@ import { GitHubPoller } from "../../../src/sources/github-poller.js";
 // Mock Agent SDK for Classifier's Haiku scope analysis
 vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
   query: vi.fn(async function* () {
+    await Promise.resolve();
     yield { type: "result", result: '{ "isLarge": false, "scopes": [] }' };
   }),
 }));

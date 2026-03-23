@@ -72,7 +72,7 @@ export class SandboxValidator {
         results.push({
           name: `forbidden:${name}`,
           passed,
-          message: passed ? `${name}: OK` : `${name} を検出: ${matches?.join(", ")}`,
+          message: passed ? `${name}: OK` : `${name} を検出: ${matches.join(", ")}`,
         });
       }
     } catch {

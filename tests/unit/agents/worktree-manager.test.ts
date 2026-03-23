@@ -43,7 +43,7 @@ describe("WorktreeManager (Per-Task)", () => {
     execMock.mockImplementation(() => {
       throw new Error("git error");
     });
-    expect(() => manager.cleanup("gh-42-0")).not.toThrow();
+    expect(() => { manager.cleanup("gh-42-0"); }).not.toThrow();
   });
 
   it("each task gets its own directory", () => {

@@ -36,7 +36,7 @@ describe("initSchema", () => {
   });
 
   it("T-SCH-004: double init is safe", () => {
-    expect(() => initSchema(db)).not.toThrow();
+    expect(() => { initSchema(db); }).not.toThrow();
   });
 
   it("T-SCH-005: rejects invalid task_type", () => {

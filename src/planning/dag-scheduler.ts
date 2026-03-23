@@ -138,7 +138,8 @@ export class DAGScheduler {
     const queue = sources.map((n) => n.id);
 
     while (queue.length > 0) {
-      const nodeId = queue.shift()!;
+      const nodeId = queue.shift();
+      if (nodeId === undefined) continue;
       if (visited.has(nodeId)) continue;
       visited.add(nodeId);
 

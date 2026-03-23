@@ -77,7 +77,10 @@ export class ModelRouter {
     }));
     scored.sort((a, b) => b.score - a.score);
 
-    const exploit = scored[0]!;
+    const exploit = scored[0];
+    if (!exploit) {
+      return { model: defaultModel, reason: "候補モデルなし。デフォルトを使用" };
+    }
 
     // Epsilon-Greedy: explorationRate の確率で探索
     if (Math.random() < this.config.explorationRate) {
@@ -87,7 +90,11 @@ export class ModelRouter {
       );
 
       if (others.length > 0) {
-        const explore = others[Math.floor(Math.random() * others.length)]!;
+        const randomIndex = Math.floor(Math.random() * others.length);
+        const explore = others[randomIndex];
+        if (!explore) {
+          return { model: exploit.model, reason: "fallback: explore candidate not found" };
+        }
         this.logger.debug(
           { agentRole, taskType, model: explore.model, reason: "exploration" },
           "Model selected (explore)",

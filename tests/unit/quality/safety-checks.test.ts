@@ -22,7 +22,7 @@ describe("runSafetyChecks", () => {
 
     const leaked = checks.find((c) => c.name.includes("秘密情報"));
     expect(leaked).toBeDefined();
-    expect(leaked!.passed).toBe(false);
+    if (leaked) { expect(leaked.passed).toBe(false); }
   });
 
   it("detects private key in diff", () => {
@@ -34,7 +34,7 @@ describe("runSafetyChecks", () => {
 
     const leaked = checks.find((c) => c.name.includes("秘密鍵"));
     expect(leaked).toBeDefined();
-    expect(leaked!.passed).toBe(false);
+    if (leaked) { expect(leaked.passed).toBe(false); }
   });
 
   it("detects protected file deletion", () => {
@@ -46,7 +46,7 @@ describe("runSafetyChecks", () => {
 
     const deleted = checks.find((c) => c.name.includes("protected_file_deletion"));
     expect(deleted).toBeDefined();
-    expect(deleted!.passed).toBe(false);
+    if (deleted) { expect(deleted.passed).toBe(false); }
   });
 
   it("detects diff size over limit", () => {
@@ -58,7 +58,7 @@ describe("runSafetyChecks", () => {
 
     const sizeCheck = checks.find((c) => c.name === "diff_size_per_node");
     expect(sizeCheck).toBeDefined();
-    expect(sizeCheck!.passed).toBe(false);
+    if (sizeCheck) { expect(sizeCheck.passed).toBe(false); }
   });
 
   it("passes diff within size limit", () => {
@@ -69,7 +69,7 @@ describe("runSafetyChecks", () => {
     });
 
     const sizeCheck = checks.find((c) => c.name === "diff_size_per_node");
-    expect(sizeCheck!.passed).toBe(true);
+    if (sizeCheck) { expect(sizeCheck.passed).toBe(true); }
   });
 
   it("checks PR total diff size", () => {
@@ -82,7 +82,7 @@ describe("runSafetyChecks", () => {
 
     const prCheck = checks.find((c) => c.name === "diff_size_per_pr");
     expect(prCheck).toBeDefined();
-    expect(prCheck!.passed).toBe(false);
+    if (prCheck) { expect(prCheck.passed).toBe(false); }
   });
 
   it("detects binary files", () => {
@@ -93,7 +93,7 @@ describe("runSafetyChecks", () => {
     });
 
     const binaryCheck = checks.find((c) => c.name === "binary_file_detection");
-    expect(binaryCheck!.passed).toBe(false);
+    if (binaryCheck) { expect(binaryCheck.passed).toBe(false); }
   });
 
   it("allows non-protected file deletion", () => {

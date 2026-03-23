@@ -49,8 +49,8 @@ describe("CreateTaskInputSchema", () => {
   it("T-TYP-005: rejects when required fields are missing", () => {
     for (const field of ["id", "taskType", "title", "description", "source"] as const) {
       const input = { ...validInput };
-      delete (input as Record<string, unknown>)[field];
-      expect(CreateTaskInputSchema.safeParse(input).success).toBe(false);
+      const { [field]: _removed, ...rest } = input as Record<string, unknown>;
+      expect(CreateTaskInputSchema.safeParse(rest).success).toBe(false);
     }
   });
 

@@ -1,6 +1,5 @@
 import type pino from "pino";
 
-import type { AgentConfigV3 } from "../types.js";
 import { getAgentConfigV3 } from "../agents/agent-config.js";
 import type { WorktreeManager } from "../agents/worktree-manager.js";
 
@@ -58,7 +57,7 @@ interface ClassifiedComment {
 const MAX_ITERATIONS = 5;
 
 function isBot(comment: { user: { login: string } | null }): boolean {
-  const login = comment.user?.login?.toLowerCase() ?? "";
+  const login = comment.user?.login.toLowerCase() ?? "";
   if (!login) return true;
   return login.includes("bot") || login.includes("[bot]");
 }
@@ -129,7 +128,7 @@ export class PRReviewResponder {
           await this.handleFixRequest(prNumber, branch, item);
         } else if (item.type === "question") {
           await this.handleQuestion(prNumber, item);
-        } else if (item.type === "suggestion") {
+        } else {
           await this.handleSuggestion(prNumber, branch, item);
         }
         processed++;

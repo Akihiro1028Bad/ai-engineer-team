@@ -28,7 +28,7 @@ describe("createLogger", () => {
     const child = logger.child({ taskId: "gh-42", agentRole: "reviewer" });
     child.info("test message");
     expect(lines.length).toBe(1);
-    const parsed: unknown = JSON.parse(lines[0]!);
+    const parsed: unknown = JSON.parse(lines[0] ?? "{}");
     expect(parsed).toHaveProperty("taskId", "gh-42");
     expect(parsed).toHaveProperty("agentRole", "reviewer");
   });
@@ -54,7 +54,7 @@ describe("createLogger", () => {
     logger.warn("line 2");
     expect(lines.length).toBe(2);
     for (const line of lines) {
-      expect(() => JSON.parse(line)).not.toThrow();
+      expect(() => JSON.parse(line) as unknown).not.toThrow();
     }
   });
 });

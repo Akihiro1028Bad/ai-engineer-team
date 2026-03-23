@@ -39,7 +39,7 @@ const MAX_ROUNDS = 3;
 const TIMEOUT_DAYS = 7;
 
 function isBot(comment: { body: string; user: { login: string } | null }): boolean {
-  const login = comment.user?.login?.toLowerCase() ?? "";
+  const login = comment.user?.login.toLowerCase() ?? "";
   if (!login) return true;
   const BOT_LOGINS = ["vercel", "github-actions", "dependabot", "renovate"];
   if (login.includes("bot") || login.includes("[bot]") || BOT_LOGINS.includes(login)) return true;

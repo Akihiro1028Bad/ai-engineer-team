@@ -77,8 +77,8 @@ describe("RelatedIssueDetector", () => {
   it("limits results to max 5", async () => {
     const issues = Array.from({ length: 20 }, (_, i) => ({
       number: i + 1,
-      title: "Login button issue variant " + i,
-      body: "The login button has a problem " + i,
+      title: "Login button issue variant " + String(i),
+      body: "The login button has a problem " + String(i),
     }));
     const octokit = makeOctokit(issues);
 

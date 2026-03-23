@@ -107,9 +107,9 @@ const AGENT_CONFIGS = {
 } as const satisfies Record<AgentRole, AgentConfig>;
 
 export function getAgentConfig(role: AgentRole): AgentConfig {
-  const config = AGENT_CONFIGS[role];
+  const config: AgentConfig | undefined = (AGENT_CONFIGS as Record<string, AgentConfig | undefined>)[role];
   if (!config) {
-    throw new Error(`Unknown agent role: ${String(role)}`);
+    throw new Error(`Unknown agent role: ${role}`);
   }
   return config;
 }
@@ -280,8 +280,7 @@ export function getAgentConfigV3(role: AgentRoleV3): AgentConfigV3 {
   if (!config) {
     // v2.1 互換: 旧ロール名でフォールバック
     const legacyConfig = AGENT_CONFIGS[role as AgentRole];
-    if (legacyConfig) return legacyConfig as unknown as AgentConfigV3;
-    throw new Error(`Unknown agent role: ${String(role)}`);
+    return legacyConfig as unknown as AgentConfigV3;
   }
   return config;
 }

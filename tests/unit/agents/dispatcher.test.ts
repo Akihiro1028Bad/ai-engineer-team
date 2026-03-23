@@ -7,6 +7,7 @@ import type { Task, AgentConfig } from "../../../src/types.js";
 const mockQueryResults: unknown[] = [];
 vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
   query: vi.fn(async function* () {
+    await Promise.resolve();
     for (const msg of mockQueryResults) {
       yield msg;
     }
@@ -145,6 +146,7 @@ describe("Dispatcher", () => {
     const { query } = await import("@anthropic-ai/claude-agent-sdk");
     // @ts-expect-error mock override for testing
     vi.mocked(query).mockImplementationOnce(async function* () {
+      await Promise.resolve();
       throw new Error("Connection failed");
     });
 
@@ -167,7 +169,8 @@ describe("Dispatcher", () => {
     await dispatcher.dispatch(makeTask(), reviewerConfig);
     const calls = vi.mocked(query).mock.calls;
     expect(calls.length).toBeGreaterThan(0);
-    const opts = calls[calls.length - 1]![0] as { options?: { allowedTools?: string[] } };
+    const lastCall = calls[calls.length - 1] ?? [];
+    const opts = lastCall[0] as { options?: { allowedTools?: string[] } };
     expect(opts.options?.allowedTools).toEqual(["Read", "Glob", "Grep"]);
   });
 
@@ -184,7 +187,8 @@ describe("Dispatcher", () => {
     const { query } = await import("@anthropic-ai/claude-agent-sdk");
     await dispatcher.dispatch(makeTask(), reviewerConfig);
     const calls = vi.mocked(query).mock.calls;
-    const opts = calls[calls.length - 1]![0] as { options?: { cwd?: string } };
+    const lastCall = calls[calls.length - 1] ?? [];
+    const opts = lastCall[0] as { options?: { cwd?: string } };
     expect(opts.options?.cwd).toBe("/tmp/worktrees/test-001");
   });
 

@@ -7,6 +7,7 @@ import { Classifier } from "../../src/agents/classifier.js";
 // Mock Agent SDK for Haiku
 vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
   query: vi.fn(async function* () {
+    await Promise.resolve();
     yield { type: "result", result: '{ "isLarge": false, "scopes": [] }' };
   }),
 }));
@@ -32,13 +33,14 @@ describe("Full pipeline (design-first flow)", () => {
     });
 
     expect(result.pipelines).toHaveLength(1);
-    const cls = result.pipelines[0]!.classification;
+    const pipeline0 = result.pipelines[0] ?? { classification: { complexity: "single" as const, taskType: "review" as const, issueId: 0 } };
+    const cls = pipeline0.classification;
     expect(cls.complexity).toBe("pipeline");
     if (cls.complexity === "pipeline") {
       expect(cls.subTasks).toHaveLength(2);
-      expect(cls.subTasks[0]!.taskType).toBe("review");
-      expect(cls.subTasks[1]!.taskType).toBe("fix");
-      expect(cls.subTasks[0]!.description).toContain("design.md");
+      expect(cls.subTasks[0] ?? {}).toHaveProperty("taskType", "review");
+      expect(cls.subTasks[1] ?? {}).toHaveProperty("taskType", "fix");
+      expect((cls.subTasks[0] ?? { description: "" }).description).toContain("design.md");
     }
   });
 
@@ -54,12 +56,13 @@ describe("Full pipeline (design-first flow)", () => {
     });
 
     expect(result.pipelines).toHaveLength(1);
-    const cls = result.pipelines[0]!.classification;
+    const pipeline0 = result.pipelines[0] ?? { classification: { complexity: "single" as const, taskType: "review" as const, issueId: 0 } };
+    const cls = pipeline0.classification;
     expect(cls.complexity).toBe("pipeline");
     if (cls.complexity === "pipeline") {
       expect(cls.subTasks).toHaveLength(2);
-      expect(cls.subTasks[0]!.taskType).toBe("review");
-      expect(cls.subTasks[1]!.taskType).toBe("build");
+      expect(cls.subTasks[0] ?? {}).toHaveProperty("taskType", "review");
+      expect(cls.subTasks[1] ?? {}).toHaveProperty("taskType", "build");
     }
   });
 

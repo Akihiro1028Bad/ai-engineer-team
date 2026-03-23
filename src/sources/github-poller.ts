@@ -70,7 +70,7 @@ interface OctokitLike {
 }
 
 function isBot(comment: { body: string; user: { login: string } | null }): boolean {
-  const login = comment.user?.login?.toLowerCase() ?? "";
+  const login = comment.user?.login.toLowerCase() ?? "";
   if (!login) return true;
   const BOT_LOGINS = ["vercel", "github-actions", "dependabot", "renovate"];
   if (login.includes("bot") || login.includes("[bot]") || BOT_LOGINS.includes(login)) return true;
@@ -393,7 +393,7 @@ export class GitHubPoller {
     // Reviewer (Opus) で design.md を修正
     const config = getAgentConfig("reviewer");
     const issueMatch = /^gh-(\d+)-/.exec(taskId);
-    const issueNumber = issueMatch ? issueMatch[1]! : "unknown";
+    const issueNumber = issueMatch ? issueMatch[1] ?? "" : "unknown";
 
     const feedbackTask = {
       id: taskId,

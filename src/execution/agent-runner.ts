@@ -75,11 +75,11 @@ export class AgentRunner {
 
     // タイムアウト制御
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), config.timeoutMs);
+    const timeoutId = setTimeout(() => { controller.abort(); }, config.timeoutMs);
 
     // 外部 signal との連携
     if (signal) {
-      signal.addEventListener("abort", () => controller.abort(), { once: true });
+      signal.addEventListener("abort", () => { controller.abort(); }, { once: true });
     }
 
     try {

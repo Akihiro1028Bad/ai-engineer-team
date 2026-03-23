@@ -45,7 +45,7 @@ describe("TaskQueue", () => {
 
     it("T-TQ-003: rejects duplicate ID", () => {
       queue.push(makeInput());
-      expect(() => queue.push(makeInput())).toThrow();
+      expect(() => { queue.push(makeInput()); }).toThrow();
     });
 
     it("T-TQ-004: adds pipeline subtasks in batch", () => {
@@ -309,7 +309,7 @@ describe("TaskQueue", () => {
         makeInput({ id: "new1" }),
         makeInput({ id: "ok1" }), // duplicate
       ];
-      expect(() => queue.pushPipeline(badTasks)).toThrow();
+      expect(() => { queue.pushPipeline(badTasks); }).toThrow();
       // new1 should NOT exist due to rollback
       expect(queue.getById("new1")).toBeUndefined();
     });

@@ -31,7 +31,7 @@ import { DAGScheduler } from "./planning/dag-scheduler.js";
 import { CostEstimator } from "./planning/cost-estimator.js";
 import { DryRunPreview } from "./planning/dry-run.js";
 import type pino from "pino";
-import type { AgentConfig, TaskType } from "./types.js";
+import type { AgentConfig } from "./types.js";
 import type { ExecutionPlan } from "./types/execution-plan.js";
 
 /** リポジトリごとのコンポーネント参照 */
@@ -126,7 +126,7 @@ export class Orchestrator {
     queue.recoverFromCrash();
     logger.info("Crash recovery complete");
 
-    while (this.running) {
+    while (this.running) { // eslint-disable-line @typescript-eslint/no-unnecessary-condition
       try {
         await this.tick();
       } catch (error: unknown) {
@@ -217,7 +217,7 @@ export class Orchestrator {
           this.activeTasks -= 1;
         });
       } else {
-        const role = taskTypeToRole(task.taskType as TaskType);
+        const role = taskTypeToRole(task.taskType);
         const config = getAgentConfig(role);
 
         logger.info({ taskId: task.id, agent: config.role }, "Dispatching via v2.1 flow");
@@ -302,7 +302,8 @@ export class Orchestrator {
       queue.updateStatus(taskId, "planning");
       this.deps.statusEmitter?.emitProgress(taskId, "コードベースを分析中...");
 
-      const analysisReport = await this.analyzerAgent!.analyze({
+      if (!this.analyzerAgent) throw new Error("analyzerAgent not initialized");
+      const analysisReport = await this.analyzerAgent.analyze({
         issueNumber,
         title: task.title,
         body: task.description,
@@ -324,7 +325,8 @@ export class Orchestrator {
         task.taskType, undefined,
       ) ?? "";
 
-      const plan = await this.plannerAgent!.plan({
+      if (!this.plannerAgent) throw new Error("plannerAgent not initialized");
+      const plan = await this.plannerAgent.plan({
         taskId,
         issueNumber,
         title: task.title,
@@ -356,8 +358,10 @@ export class Orchestrator {
       }, "Execution plan generated");
 
       // Step 2.5: コスト/時間見積を表示
-      const estimate = this.costEstimator!.estimate(plan);
-      this.deps.statusEmitter?.emitProgress(taskId, this.costEstimator!.formatSummary(estimate));
+      if (!this.costEstimator) throw new Error("costEstimator not initialized");
+      if (!this.dagScheduler) throw new Error("dagScheduler not initialized");
+      const estimate = this.costEstimator.estimate(plan);
+      this.deps.statusEmitter?.emitProgress(taskId, this.costEstimator.formatSummary(estimate));
 
       // Step 2.6: Dry Run モード
       if (this.deps.dryRunDefault) {
@@ -371,7 +375,7 @@ export class Orchestrator {
       }
 
       // Step 3: DAG スケジューリング
-      const schedule = this.dagScheduler!.schedule(plan);
+      const schedule = this.dagScheduler.schedule(plan);
       logger.info({
         taskId,
         batches: schedule.batches.length,
@@ -783,7 +787,9 @@ export class Orchestrator {
   private findPollerForTask(_taskId: string): GitHubPoller | undefined {
     if (this.deps.repoComponents && this.deps.repoComponents.length > 0) {
       // TODO: タスクの repo フィールドで特定
-      return this.deps.repoComponents[0]!.githubPoller;
+      const first = this.deps.repoComponents[0];
+      if (!first) return undefined;
+      return first.githubPoller;
     }
     return this.deps.githubPoller;
   }
@@ -791,7 +797,9 @@ export class Orchestrator {
   /** タスク ID からリポジトリの ResultCollector を特定する */
   private findCollectorForTask(_taskId: string): ResultCollector | undefined {
     if (this.deps.repoComponents && this.deps.repoComponents.length > 0) {
-      return this.deps.repoComponents[0]!.resultCollector;
+      const first = this.deps.repoComponents[0];
+      if (!first) return undefined;
+      return first.resultCollector;
     }
     return this.deps.resultCollector;
   }

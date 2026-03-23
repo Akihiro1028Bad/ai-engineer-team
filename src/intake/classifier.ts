@@ -353,7 +353,7 @@ export class ClassifierV3 {
         }
       }
 
-      if (structuredOutput && typeof structuredOutput === "object" && structuredOutput !== null) {
+      if (typeof structuredOutput === "object" && structuredOutput !== null) {
         const conf = (structuredOutput as { confidence?: number }).confidence;
         if (typeof conf === "number" && conf > originalConfidence) {
           return conf;
@@ -376,7 +376,7 @@ export class ClassifierV3 {
       if (result.length > 0) return result;
 
       if (attempt < MAX_RETRIES - 1) {
-        await new Promise((r) => setTimeout(r, BACKOFF_MS[attempt]!));
+        await new Promise((r) => setTimeout(r, BACKOFF_MS[attempt]));
       }
     }
 

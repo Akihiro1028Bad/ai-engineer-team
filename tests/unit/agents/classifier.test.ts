@@ -5,6 +5,7 @@ import { Classifier } from "../../../src/agents/classifier.js";
 const mockHaikuResult: unknown[] = [];
 vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
   query: vi.fn(async function* () {
+    await Promise.resolve();
     for (const msg of mockHaikuResult) {
       yield msg;
     }
@@ -12,7 +13,7 @@ vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
 }));
 
 const mockOctokit = {
-  issues: { createComment: async () => ({}) },
+  issues: { createComment: async () => { await Promise.resolve(); return {}; } },
 };
 
 interface Issue {
@@ -48,12 +49,13 @@ describe("Classifier", () => {
 
     const result = await classifier.classify(makeIssue());
     expect(result.pipelines).toHaveLength(1);
-    expect(result.pipelines[0]!.scopeId).toBe("main");
-    const sub = result.pipelines[0]!.classification;
+    const p0 = result.pipelines[0] ?? { scopeId: "", classification: { complexity: "single" as const, taskType: "review" as const, issueId: 0 } };
+    expect(p0.scopeId).toBe("main");
+    const sub = p0.classification;
     if (sub.complexity === "pipeline") {
       expect(sub.subTasks).toHaveLength(2);
-      expect(sub.subTasks[0]!.taskType).toBe("review");
-      expect(sub.subTasks[1]!.taskType).toBe("fix");
+      expect(sub.subTasks[0] ?? {}).toHaveProperty("taskType", "review");
+      expect(sub.subTasks[1] ?? {}).toHaveProperty("taskType", "fix");
     }
   });
 
@@ -72,16 +74,16 @@ describe("Classifier", () => {
 
     const result = await classifier.classify(makeIssue({ number: 22, title: "スマホ表示の改善" }));
     expect(result.pipelines).toHaveLength(3);
-    expect(result.pipelines[0]!.scopeId).toBe("scope-1");
-    expect(result.pipelines[1]!.scopeId).toBe("scope-2");
-    expect(result.pipelines[2]!.scopeId).toBe("scope-3");
+    expect((result.pipelines[0] ?? { scopeId: "" }).scopeId).toBe("scope-1");
+    expect((result.pipelines[1] ?? { scopeId: "" }).scopeId).toBe("scope-2");
+    expect((result.pipelines[2] ?? { scopeId: "" }).scopeId).toBe("scope-3");
 
     // 各スコープが独立した [review, fix] パイプライン
     for (const p of result.pipelines) {
       if (p.classification.complexity === "pipeline") {
         expect(p.classification.subTasks).toHaveLength(2);
-        expect(p.classification.subTasks[0]!.taskType).toBe("review");
-        expect(p.classification.subTasks[1]!.taskType).toBe("fix");
+        expect(p.classification.subTasks[0] ?? {}).toHaveProperty("taskType", "review");
+        expect(p.classification.subTasks[1] ?? {}).toHaveProperty("taskType", "fix");
       }
     }
   });
@@ -93,8 +95,9 @@ describe("Classifier", () => {
     });
 
     const result = await classifier.classify(makeIssue({ labels: ["feature"] }));
-    if (result.pipelines[0]!.classification.complexity === "pipeline") {
-      expect(result.pipelines[0]!.classification.subTasks[1]!.taskType).toBe("build");
+    const fp0 = result.pipelines[0] ?? { classification: { complexity: "single" as const, taskType: "review" as const, issueId: 0 } };
+    if (fp0.classification.complexity === "pipeline") {
+      expect(fp0.classification.subTasks[1] ?? {}).toHaveProperty("taskType", "build");
     }
   });
 
@@ -103,6 +106,7 @@ describe("Classifier", () => {
     const { query } = await import("@anthropic-ai/claude-agent-sdk");
     // @ts-expect-error mock override
     vi.mocked(query).mockImplementationOnce(async function* () {
+      await Promise.resolve();
       throw new Error("API error");
     });
 
@@ -123,11 +127,12 @@ describe("Classifier", () => {
     });
 
     const result = await classifier.classify(makeIssue({ number: 22 }));
-    const cls0 = result.pipelines[0]!.classification;
-    const cls1 = result.pipelines[1]!.classification;
+    const defaultCls = { complexity: "single" as const, taskType: "review" as const, issueId: 0 };
+    const cls0 = (result.pipelines[0] ?? { classification: defaultCls }).classification;
+    const cls1 = (result.pipelines[1] ?? { classification: defaultCls }).classification;
     if (cls0.complexity === "pipeline" && cls1.complexity === "pipeline") {
-      expect(cls0.subTasks[0]!.description).toContain("scope-1/design.md");
-      expect(cls1.subTasks[0]!.description).toContain("scope-2/design.md");
+      expect((cls0.subTasks[0] ?? { description: "" }).description).toContain("scope-1/design.md");
+      expect((cls1.subTasks[0] ?? { description: "" }).description).toContain("scope-2/design.md");
     }
   });
 });

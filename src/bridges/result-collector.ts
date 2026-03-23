@@ -60,10 +60,13 @@ export class ResultCollector {
   }
 
   async createFinalPR(tasks: Task[], branch: string): Promise<PRResult> {
-    const mainTask = tasks[0]!;
+    const mainTask = tasks[0];
+    if (!mainTask) {
+      return { success: false, error: "No tasks provided" };
+    }
     const summary = tasks.map((t) => `- ${t.taskType}: ${t.title}`).join("\n");
     return this.createPR({
-      title: `${mainTask.title}`,
+      title: mainTask.title,
       body: this.buildPRBody(mainTask, `パイプライン完了\n\n${summary}`),
       branch,
       notificationEvent: "pipeline_pr_created",
@@ -97,7 +100,7 @@ export class ResultCollector {
           base: "main",
           head: params.branch,
         });
-        const lineCount = String(diff).split("\n").filter((l) => l.startsWith("+") || l.startsWith("-")).length;
+        const lineCount = diff.split("\n").filter((l) => l.startsWith("+") || l.startsWith("-")).length;
         if (lineCount > DIFF_LIMIT) {
           return {
             success: false,

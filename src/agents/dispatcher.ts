@@ -32,7 +32,7 @@ export interface DispatchResult {
 /** Issue 番号を taskId から抽出する (gh-{N}-0 → N) */
 function extractIssueNumber(taskId: string): string | null {
   const match = /^gh-(\d+)-/.exec(taskId);
-  return match ? match[1]! : null;
+  return match ? match[1] ?? "" : null;
 }
 
 export class Dispatcher {

@@ -67,7 +67,7 @@ describe("ResultCollector", () => {
   });
 
   it("T-RC-003: creates single PR and sends task_completed", async () => {
-    const result = await collector.createSinglePR(makeTask(), "agent/reviewer/gh-42-0");
+    const _result = await collector.createSinglePR(makeTask(), "agent/reviewer/gh-42-0");
     expect(mockCreatePR).toHaveBeenCalled();
     expect(slackSendSpy).toHaveBeenCalledWith(
       expect.objectContaining({ event: "task_completed" }),
@@ -95,14 +95,16 @@ describe("ResultCollector", () => {
 
   it("T-RC-007: PR body includes evidence section", async () => {
     await collector.createSinglePR(makeTask({ result: '{"test":"pass"}' }), "branch");
-    const body = mockCreatePR.mock.calls[0]![0].body as string;
+    const calls = mockCreatePR.mock.calls as unknown[][];
+    const call = calls[0] ?? [];
+    const arg = call[0] as { body?: string } | undefined;
+    const body = arg?.body ?? "";
     expect(body).toContain("エビデンス");
   });
 
   it("T-RC-008: skips Slack when notifier has no URL", async () => {
+    await Promise.resolve();
     const nullNotifier = new SlackNotifier(undefined);
-    const c = new ResultCollector({} as never, nullNotifier, "org", "repo");
-    // This should not throw even without real octokit
-    // (the octokit call would fail but Slack part is safe)
+    const _c = new ResultCollector({} as never, nullNotifier, "org", "repo");
   });
 });

@@ -19,7 +19,7 @@ describe("runMigrations", () => {
 
   it("T-MIG-002: skips if already at latest version", () => {
     runMigrations(db);
-    expect(() => runMigrations(db)).not.toThrow();
+    expect(() => { runMigrations(db); }).not.toThrow();
   });
 
   it("T-MIG-003: applies only pending migrations", () => {

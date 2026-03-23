@@ -11,9 +11,9 @@ interface ParseResult {
 function parseArgs(args: string[]): Map<string, string> {
   const map = new Map<string, string>();
   for (let i = 0; i < args.length; i++) {
-    const arg = args[i]!;
+    const arg = args[i] ?? "";
     if (arg.startsWith("--") && i + 1 < args.length) {
-      map.set(arg.slice(2), args[i + 1]!);
+      map.set(arg.slice(2), args[i + 1] ?? "");
       i++;
     }
   }

@@ -48,8 +48,8 @@ describe("CostEstimator", () => {
     ]);
     const result = estimator.estimate(plan);
 
-    // haiku default is 0.05
-    expect(result.perNode[0]!.estimatedCostUsd).toBeCloseTo(0.05, 2);
+    const node0 = result.perNode[0] ?? { estimatedCostUsd: 0 };
+    expect(node0.estimatedCostUsd).toBeCloseTo(0.05, 2);
   });
 
   it("estimates duration for sequential nodes", () => {
@@ -59,10 +59,11 @@ describe("CostEstimator", () => {
     ]);
     const result = estimator.estimate(plan);
 
-    // Sequential: designer (420s) + implementer (1200s) = 1620s
     expect(result.totalDurationMs).toBeGreaterThan(0);
+    const node0 = result.perNode[0] ?? { estimatedDurationMs: 0 };
+    const node1 = result.perNode[1] ?? { estimatedDurationMs: 0 };
     expect(result.totalDurationMs).toBe(
-      result.perNode[0]!.estimatedDurationMs + result.perNode[1]!.estimatedDurationMs,
+      node0.estimatedDurationMs + node1.estimatedDurationMs,
     );
   });
 
@@ -74,9 +75,8 @@ describe("CostEstimator", () => {
     ]);
     const result = estimator.estimate(plan);
 
-    // Parallel n1/n2 → n3: max(n1, n2) + n3
-    const n1Duration = result.perNode[0]!.estimatedDurationMs;
-    const n3Duration = result.perNode[2]!.estimatedDurationMs;
+    const n1Duration = (result.perNode[0] ?? { estimatedDurationMs: 0 }).estimatedDurationMs;
+    const n3Duration = (result.perNode[2] ?? { estimatedDurationMs: 0 }).estimatedDurationMs;
     expect(result.totalDurationMs).toBe(n1Duration + n3Duration);
   });
 

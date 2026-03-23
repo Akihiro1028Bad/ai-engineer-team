@@ -1,6 +1,5 @@
 import type { TaskQueue } from "../queue/task-queue.js";
 import type { Dispatcher } from "../agents/dispatcher.js";
-import { getAgentConfig } from "../agents/agent-config.js";
 import type pino from "pino";
 
 interface CheckRun {

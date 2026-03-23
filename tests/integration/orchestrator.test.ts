@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import Database from "better-sqlite3";
 import { initSchema } from "../../src/queue/schema.js";
 import { TaskQueue } from "../../src/queue/task-queue.js";
@@ -16,6 +16,7 @@ import { Writable } from "node:stream";
 // Mock Agent SDK
 vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
   query: vi.fn(async function* () {
+    await Promise.resolve();
     yield {
       type: "result",
       subtype: "success",

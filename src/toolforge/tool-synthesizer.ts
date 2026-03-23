@@ -123,8 +123,8 @@ export class ToolSynthesizer {
   /** Sonnet の出力からファイルを抽出する */
   private parseOutput(gap: ToolGap, output: string): SynthesizedTool | null {
     // ```typescript ブロックを抽出
-    const codeBlocks = [...output.matchAll(/```(?:typescript|ts)\n([\s\S]*?)```/g)].map((m) => m[1]!);
-    const mdBlocks = [...output.matchAll(/```markdown\n([\s\S]*?)```/g)].map((m) => m[1]!);
+    const codeBlocks = [...output.matchAll(/```(?:typescript|ts)\n([\s\S]*?)```/g)].map((m) => m[1] ?? "");
+    const mdBlocks = [...output.matchAll(/```markdown\n([\s\S]*?)```/g)].map((m) => m[1] ?? "");
 
     if (codeBlocks.length < 3) {
       this.logger.warn({ gap: gap.suggestedToolName, blocks: codeBlocks.length }, "Insufficient code blocks");
@@ -139,9 +139,9 @@ export class ToolSynthesizer {
     return {
       name: gap.suggestedToolName,
       description: gap.description,
-      handlerCode: codeBlocks[0]!,
-      schemaCode: codeBlocks[1]!,
-      testCode: codeBlocks[2]!,
+      handlerCode: codeBlocks[0] ?? "",
+      schemaCode: codeBlocks[1] ?? "",
+      testCode: codeBlocks[2] ?? "",
       skillMd: mdBlocks[0] ?? `---\nname: ${gap.suggestedToolName}\ndescription: ${gap.description}\n---\n`,
       safetyLevel,
     };

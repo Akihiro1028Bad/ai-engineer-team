@@ -13,6 +13,13 @@ function makeNotification(overrides: Partial<SlackNotification> = {}): SlackNoti
   };
 }
 
+function extractBody(fetchMock: ReturnType<typeof vi.fn>): Record<string, unknown> {
+  const calls = fetchMock.mock.calls as unknown[][];
+  const firstCall = calls[0] ?? [];
+  const opts = firstCall[1] as { body?: string } | undefined;
+  return JSON.parse(opts?.body ?? "{}") as Record<string, unknown>;
+}
+
 describe("SlackNotifier", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 
@@ -25,22 +32,25 @@ describe("SlackNotifier", () => {
     const notifier = new SlackNotifier("https://hooks.slack.com/test");
     await notifier.send(makeNotification({ level: "info" }));
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const body = JSON.parse(fetchMock.mock.calls[0]![1]!.body as string) as { attachments: { color: string }[] };
-    expect(body.attachments[0]!.color).toBe("#36a64f");
+    const body = extractBody(fetchMock) as { attachments: { color: string }[] };
+    const att = body.attachments[0] ?? { color: "" };
+    expect(att.color).toBe("#36a64f");
   });
 
   it("T-SN-002: sends warn with yellow color", async () => {
     const notifier = new SlackNotifier("https://hooks.slack.com/test");
     await notifier.send(makeNotification({ level: "warn" }));
-    const body = JSON.parse(fetchMock.mock.calls[0]![1]!.body as string) as { attachments: { color: string }[] };
-    expect(body.attachments[0]!.color).toBe("#ff9900");
+    const body = extractBody(fetchMock) as { attachments: { color: string }[] };
+    const att = body.attachments[0] ?? { color: "" };
+    expect(att.color).toBe("#ff9900");
   });
 
   it("T-SN-003: sends error with red color", async () => {
     const notifier = new SlackNotifier("https://hooks.slack.com/test");
     await notifier.send(makeNotification({ level: "error" }));
-    const body = JSON.parse(fetchMock.mock.calls[0]![1]!.body as string) as { attachments: { color: string }[] };
-    expect(body.attachments[0]!.color).toBe("#cc0000");
+    const body = extractBody(fetchMock) as { attachments: { color: string }[] };
+    const att = body.attachments[0] ?? { color: "" };
+    expect(att.color).toBe("#cc0000");
   });
 
   it("T-SN-004: skips when webhook URL is undefined", async () => {
@@ -70,8 +80,9 @@ describe("SlackNotifier", () => {
         fields: { completed: "7", failed: "1", cost: "$4.23" },
       }),
     );
-    const body = JSON.parse(fetchMock.mock.calls[0]![1]!.body as string) as { attachments: { text: string }[] };
-    expect(body.attachments[0]!.text).toContain("完了: 7 tasks");
+    const body = extractBody(fetchMock) as { attachments: { text: string }[] };
+    const att = body.attachments[0] ?? { text: "" };
+    expect(att.text).toContain("完了: 7 tasks");
   });
 
   it("T-SN-008: sends successfully with empty fields", async () => {
@@ -88,8 +99,9 @@ describe("SlackNotifier", () => {
         fields: { prUrl: "https://github.com/org/repo/pull/123" },
       }),
     );
-    const body = JSON.parse(fetchMock.mock.calls[0]![1]!.body as string) as { attachments: { fields: { value: string }[] }[] };
-    const fieldValues = body.attachments[0]!.fields.map((f) => f.value);
+    const body = extractBody(fetchMock) as { attachments: { fields: { value: string }[] }[] };
+    const att = body.attachments[0] ?? { fields: [] };
+    const fieldValues = att.fields.map((f) => f.value);
     expect(fieldValues).toContain("https://github.com/org/repo/pull/123");
   });
 

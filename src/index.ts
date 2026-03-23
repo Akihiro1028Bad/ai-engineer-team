@@ -78,7 +78,7 @@ async function main(): Promise<void> {
   const slackNotifier = new SlackNotifier(config.slackWebhookUrl);
   const cronScheduler = new CronScheduler(queue);
   const statusEmitter = new StatusEmitter();
-  const hierarchicalBudget = config.dailyBudgetUsd
+  const _hierarchicalBudget = config.dailyBudgetUsd
     ? new HierarchicalBudgetGuard(config.dailyBudgetUsd, logger)
     : undefined;
 
@@ -205,7 +205,10 @@ async function main(): Promise<void> {
   const budgetGuard = new BudgetGuard(config.dailyBudgetUsd);
 
   // v3.0 Execution コンポーネント
-  const primary = repoComponents[0]!;
+  const primary = repoComponents[0];
+  if (!primary) {
+    throw new Error("No repository components configured");
+  }
   const agentRunner = new AgentRunner(
     primary.worktreeManager,
     statusEmitter,
@@ -261,7 +264,7 @@ async function main(): Promise<void> {
   if (config.dashboardEnabled) {
     const dashboard = new DashboardServer(db, statusEmitter, {
       port: config.dashboardPort,
-      staticDir: join(import.meta.dirname ?? ".", "../dashboard/dist"),
+      staticDir: join(import.meta.dirname, "../dashboard/dist"),
     }, logger);
     dashboard.start();
     logger.info({ port: config.dashboardPort }, "Dashboard server enabled");
