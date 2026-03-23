@@ -141,14 +141,19 @@ export class CIMonitor {
     const fixingTasks = this.queue.getByStatus("ci_fixing");
 
     for (const task of fixingTasks) {
-      // 最新の cifix タスクを探す（ci_fix_count が現在の試行番号）
-      const fixTaskId = `${task.id}-cifix-${task.ciFixCount}`;
-      const fixTask = this.queue.getById(fixTaskId);
+      // 最新の cifix パイプラインの impl タスクを探す
+      const implTaskId = `${task.id}-cifix-${task.ciFixCount}-impl`;
+      const implTask = this.queue.getById(implTaskId);
 
-      if (!fixTask) continue;
+      // review タスクも確認（impl が存在しない場合は review を確認）
+      const reviewTaskId = `${task.id}-cifix-${task.ciFixCount}-review`;
+      const reviewTask = this.queue.getById(reviewTaskId);
+
+      const taskToCheck = implTask ?? reviewTask;
+      if (!taskToCheck) continue;
 
       // まだ実行中/待機中 → 何もしない（待機）
-      if (fixTask.status === "pending" || fixTask.status === "in_progress") {
+      if (taskToCheck.status === "pending" || taskToCheck.status === "in_progress") {
         continue;
       }
 
@@ -220,28 +225,59 @@ export class CIMonitor {
       // ブランチ名取得失敗時は空文字のまま（Dispatcher が通常のブランチを作成する）
     }
 
-    this.queue.push({
-      id: fixTaskId,
-      taskType: "fix",
-      title: `CI 修正 (試行 ${attempt}/${MAX_CI_FIX_ATTEMPTS})`,
-      description: [
-        `PR #${prNumber} の CI が失敗しました。以下のエラーを修正してください。`,
-        "",
-        prBranch ? `**既存ブランチ**: \`${prBranch}\`（このブランチ上で修正してください）` : "",
-        "",
-        "## CI 失敗ログ",
-        failureLogs,
-        "",
-        "## 指示",
-        "1. エラーの原因を特定してください",
-        "2. コードを修正してください",
-        "3. 修正は既存のブランチ上で行い、新しいブランチは作らないでください",
-      ].join("\n"),
-      source,
-      priority: 1,
-      dependsOn: null,
-      parentTaskId: null,
-    });
+    // CI 修正も設計書駆動: Opus で原因分析+修正方針 → Sonnet で実装
+    const reviewTaskId = `${fixTaskId}-review`;
+    const implTaskId = `${fixTaskId}-impl`;
+
+    this.queue.pushPipeline([
+      {
+        id: reviewTaskId,
+        taskType: "review",
+        title: `[CI分析] CI 修正設計 (試行 ${attempt}/${MAX_CI_FIX_ATTEMPTS})`,
+        description: [
+          `PR #${prNumber} の CI が失敗しました。原因を分析し、修正設計書を作成してください。`,
+          "",
+          prBranch ? `**既存ブランチ**: \`${prBranch}\`` : "",
+          "",
+          "## CI 失敗ログ",
+          failureLogs,
+          "",
+          "## 指示",
+          "1. CI 失敗ログからエラーの原因を特定する",
+          "2. 修正方針を決定する",
+          `3. specs/ci-fix/${parentTaskId}-${attempt}/design.md に設計書を作成する`,
+          "4. テストケースも含める",
+          "",
+          "コードの修正は行わないでください。設計書の作成のみです。",
+        ].join("\n"),
+        source,
+        priority: 1,
+        dependsOn: null,
+        parentTaskId: null,
+      },
+      {
+        id: implTaskId,
+        taskType: "fix",
+        title: `[CI修正] CI 修正実装 (試行 ${attempt}/${MAX_CI_FIX_ATTEMPTS})`,
+        description: [
+          `PR #${prNumber} の CI 修正設計書に従って修正を実装してください。`,
+          "",
+          prBranch ? `**既存ブランチ**: \`${prBranch}\`（このブランチ上で修正してください）` : "",
+          "",
+          `設計書: specs/ci-fix/${parentTaskId}-${attempt}/design.md`,
+          "",
+          "## 指示",
+          "1. 設計書を読む",
+          "2. 設計書の修正方針に従ってコードを修正する",
+          "3. テストを実行し、通ることを確認する",
+          "4. 既存のブランチ上で修正し、新しいブランチは作らないでください",
+        ].join("\n"),
+        source: `${source}:impl`,
+        priority: 1,
+        dependsOn: reviewTaskId,
+        parentTaskId: null,
+      },
+    ]);
 
     // PR にもコメント
     await this.octokit.issues.createComment({
