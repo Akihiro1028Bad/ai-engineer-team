@@ -43,6 +43,11 @@ interface OctokitLike {
       repo: string;
       pull_number: number;
     }) => Promise<{ data: { state: string }[] }>;
+    listReviewComments: (params: {
+      owner: string;
+      repo: string;
+      pull_number: number;
+    }) => Promise<{ data: { body: string; user: { login: string } | null }[] }>;
     get: (params: {
       owner: string;
       repo: string;
@@ -121,11 +126,24 @@ export class GitHubPoller {
         if (awaitingPrNumbers.has(issue.number)) continue;
 
         try {
-          const { data: comments } = await this.octokit.issues.listComments({
+          const { data: issueComments } = await this.octokit.issues.listComments({
             owner: this.owner,
             repo: this.repo,
             issue_number: issue.number,
           });
+          // PR の場合はレビューコメントも取得
+          let reviewComments: { body: string; user: { login: string } | null }[] = [];
+          if ("pull_request" in issue) {
+            try {
+              const { data: rc } = await this.octokit.pulls.listReviewComments({
+                owner: this.owner,
+                repo: this.repo,
+                pull_number: issue.number,
+              });
+              reviewComments = rc;
+            } catch { /* non-critical */ }
+          }
+          const comments = [...issueComments, ...reviewComments];
 
           for (const comment of comments) {
             // --- bot フィルタ（ユーザー名ベース） ---
@@ -285,17 +303,29 @@ export class GitHubPoller {
         // 最後の人間コメントで承認/却下を判定
         let lastHumanAction: "approve" | "reject" | null = null;
         try {
-          const { data: comments } = await this.octokit.issues.listComments({
+          // Issue/PR コメント + PR レビューコメントの両方を取得
+          const { data: issueComments } = await this.octokit.issues.listComments({
             owner: this.owner,
             repo: this.repo,
             issue_number: prNumber,
           });
+          let reviewComments: { body: string; user: { login: string } | null }[] = [];
+          try {
+            const { data: rc } = await this.octokit.pulls.listReviewComments({
+              owner: this.owner,
+              repo: this.repo,
+              pull_number: prNumber,
+            });
+            reviewComments = rc;
+          } catch { /* PR review comments 取得失敗は非致命的 */ }
+
+          const allComments = [...issueComments, ...reviewComments];
 
           const APPROVE_KEYWORDS = ["承認", "lgtm", "approve", "approved", "ok", "実装開始", "進めてください"];
           const REJECT_KEYWORDS = ["却下", "reject", "やり直し", "修正してください"];
           const botMarker = "🤖";
 
-          for (const comment of comments) {
+          for (const comment of allComments) {
             // bot / GitHub App のコメントは無視
             if (comment.body.includes(botMarker)) continue;
             if (comment.body.startsWith("[vc]:")) continue;        // Vercel
