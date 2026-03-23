@@ -153,6 +153,13 @@ export class Orchestrator {
               issue_number: prNum,
               body: `🤖 **AI Agent Orchestrator**\n\n✏️ フィードバックを反映して設計書を修正しました。再度ご確認ください。\n\n変更を確認後、「承認」とコメントしてください。`,
             });
+            // @claude /review をリクエスト
+            await octokit.issues.createComment({
+              owner,
+              repo,
+              issue_number: prNum,
+              body: "@claude /review",
+            });
           } catch { /* non-critical */ }
         }
 
