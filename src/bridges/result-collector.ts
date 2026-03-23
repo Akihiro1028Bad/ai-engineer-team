@@ -1,6 +1,17 @@
 import type { SlackNotifier } from "../notifications/slack-notifier.js";
 import type { Task } from "../types.js";
 
+interface OctokitWithIssues {
+  issues: {
+    createComment: (params: {
+      owner: string;
+      repo: string;
+      issue_number: number;
+      body: string;
+    }) => Promise<unknown>;
+  };
+}
+
 interface OctokitLike {
   pulls: {
     create: (params: {
@@ -105,6 +116,19 @@ export class ResultCollector {
         head: params.branch,
         base: "main",
       });
+
+      // @claude /review を投稿してレビューをリクエスト
+      const prNumber = Number(pr.html_url.split("/").pop());
+      try {
+        await (this.octokit as unknown as OctokitWithIssues).issues.createComment({
+          owner: this.owner,
+          repo: this.repo,
+          issue_number: prNumber,
+          body: "@claude /review",
+        });
+      } catch {
+        // レビューリクエスト失敗は非致命的
+      }
 
       await this.slackNotifier.send({
         level: "info",

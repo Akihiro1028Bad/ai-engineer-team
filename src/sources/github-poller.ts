@@ -99,6 +99,80 @@ export class GitHubPoller {
     }
   }
 
+  /** Issue・PR の全コメントを監視し、リアクション + 返信タスクを投入する */
+  async pollAllComments(): Promise<void> {
+    try {
+      const { data: issues } = await this.octokit.issues.listForRepo({
+        owner: this.owner,
+        repo: this.repo,
+        state: "open",
+      });
+
+      for (const issue of issues) {
+        try {
+          const { data: comments } = await this.octokit.issues.listComments({
+            owner: this.owner,
+            repo: this.repo,
+            issue_number: issue.number,
+          });
+
+          for (const comment of comments) {
+            // bot のコメントは無視
+            if (comment.body.includes("🤖")) continue;
+            if (comment.body.includes("@claude")) continue;
+
+            // 既に処理済みか確認
+            const commentSource = `github_comment:${issue.number}:${comment.body.slice(0, 50)}`;
+            if (this.queue.isDuplicate(commentSource)) continue;
+
+            // 👀 リアクション
+            try {
+              await this.octokit.reactions.createForIssue({
+                owner: this.owner,
+                repo: this.repo,
+                issue_number: issue.number,
+                content: "eyes",
+              });
+            } catch { /* リアクション重複は無視 */ }
+
+            // Issue の全コメント履歴を構築
+            const allComments = comments
+              .map((c) => `[${c.user?.login ?? "unknown"}]: ${c.body}`)
+              .join("\n\n---\n\n");
+
+            // 返信タスクを投入
+            this.queue.push({
+              id: `gh-${issue.number}-reply-${Date.now()}`,
+              taskType: "fix",
+              title: `Re: ${issue.title}`,
+              description: [
+                `## Issue #${issue.number}: ${issue.title}`,
+                "",
+                issue.body ?? "",
+                "",
+                "## コメント履歴",
+                "",
+                allComments,
+                "",
+                "## タスク",
+                "上記のコメント履歴を踏まえて、適切に返信してください。",
+                "質問に回答するか、調査結果を報告するか、修正提案をしてください。",
+              ].join("\n"),
+              source: commentSource,
+              priority: 3,
+              dependsOn: null,
+              parentTaskId: null,
+            });
+          }
+        } catch {
+          // 個別 Issue のコメント取得失敗は非致命的
+        }
+      }
+    } catch {
+      // API エラーは非致命的
+    }
+  }
+
   /** 全 open Issue をポーリングし、未処理の Issue をタスクキューに投入する */
   async pollIssues(): Promise<void> {
     try {

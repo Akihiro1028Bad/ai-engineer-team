@@ -67,6 +67,7 @@ export class Orchestrator {
 
     if (this.deps.githubPoller) {
       await this.deps.githubPoller.pollIssues();
+      await this.deps.githubPoller.pollAllComments();
       await this.deps.githubPoller.pollApprovals();
     }
 
