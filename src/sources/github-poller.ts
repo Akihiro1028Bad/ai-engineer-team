@@ -84,24 +84,30 @@ export class GitHubPoller {
         if (this.queue.isDuplicate(source)) continue;
 
         const labels = issue.labels.map((l) => l.name);
-        const classification = await this.classifier.classify({
+        const result = await this.classifier.classify({
           number: issue.number,
           title: issue.title,
           body: issue.body ?? "",
           labels,
         });
 
-        // 全 Issue がパイプラインとして返される
-        if (classification.complexity === "pipeline") {
+        // 各スコープごとに独立パイプラインを作成
+        for (const { scopeId, classification } of result.pipelines) {
+          if (classification.complexity !== "pipeline") continue;
+
+          const prefix = result.pipelines.length > 1
+            ? `gh-${issue.number}-${scopeId}`
+            : `gh-${issue.number}`;
+
           const tasks = classification.subTasks.map((sub, i) => ({
-            id: `gh-${issue.number}-${i}`,
+            id: `${prefix}-${i}`,
             taskType: sub.taskType,
             title: sub.title,
             description: sub.description,
-            source: i === 0 ? source : `${source}:${i}`,
+            source: i === 0 ? source : `${source}:${scopeId}:${i}`,
             priority: 5,
-            dependsOn: sub.dependsOnIndex !== null ? `gh-${issue.number}-${sub.dependsOnIndex}` : null,
-            parentTaskId: `gh-${issue.number}-0`,
+            dependsOn: sub.dependsOnIndex !== null ? `${prefix}-${sub.dependsOnIndex}` : null,
+            parentTaskId: `${prefix}-0`,
           }));
           this.queue.pushPipeline(tasks);
         }

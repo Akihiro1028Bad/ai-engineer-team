@@ -4,6 +4,13 @@ import { initSchema } from "../../../src/queue/schema.js";
 import { TaskQueue } from "../../../src/queue/task-queue.js";
 import { GitHubPoller } from "../../../src/sources/github-poller.js";
 
+// Mock Agent SDK for Classifier's Haiku scope analysis
+vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
+  query: vi.fn(async function* () {
+    yield { type: "result", result: '{ "isLarge": false, "scopes": [] }' };
+  }),
+}));
+
 function makeOctokitMock(issues: unknown[] = [], reviews: unknown[] = []) {
   return {
     issues: {
