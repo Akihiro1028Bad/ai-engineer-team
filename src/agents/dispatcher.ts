@@ -1,8 +1,9 @@
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { query } from "@anthropic-ai/claude-agent-sdk";
-import type { Task, AgentConfig } from "../types.js";
+import type { Task, AgentConfig, TaskType } from "../types.js";
 import type { WorktreeManager } from "./worktree-manager.js";
 import { taskTypeToRole } from "./role-mapping.js";
-import type { TaskType } from "../types.js";
 
 interface ResultMessage {
   type: "result";
@@ -23,36 +24,74 @@ export interface DispatchResult {
   result?: string;
   structuredOutput?: unknown;
   error?: string;
-  /** エージェントが変更をコミット・プッシュしたか */
   pushed: boolean;
-  /** プッシュしたブランチ名 */
   branch?: string;
+  /** Reviewer が作成した設計書のパス */
+  designFilePath?: string;
+}
+
+/** Issue 番号を taskId から抽出する (gh-{N}-0 → N) */
+function extractIssueNumber(taskId: string): string | null {
+  const match = /^gh-(\d+)-/.exec(taskId);
+  return match ? match[1]! : null;
 }
 
 export class Dispatcher {
   constructor(
     private readonly worktreeManager: WorktreeManager,
-    private readonly handoffDir: string,
+    private readonly _handoffDir: string,
   ) {}
 
   async dispatch(task: Task, config: AgentConfig): Promise<DispatchResult> {
     const role = taskTypeToRole(task.taskType as TaskType);
-
-    // 1. ブランチ作成 + worktree 準備
     const cwd = this.worktreeManager.prepare(role, task.id);
     const branch = this.worktreeManager.getBranchName(role, task.id);
+
+    // Fixer/Builder の場合: design.md を読んでプロンプトに追加
+    let prompt = task.description;
+    const issueNumber = extractIssueNumber(task.id);
+
+    if (task.taskType !== "review" && issueNumber) {
+      const designPath = join(cwd, `specs/issue-${issueNumber}/design.md`);
+      if (existsSync(designPath)) {
+        const designContent = readFileSync(designPath, "utf-8");
+        prompt = [
+          task.description,
+          "",
+          "## 承認済み設計書",
+          "",
+          designContent,
+        ].join("\n");
+      }
+    }
+
+    // Reviewer の場合: Issue 番号をプロンプトに埋め込む
+    if (task.taskType === "review" && issueNumber && config.systemPrompt) {
+      // systemPrompt 内の {ISSUE_NUMBER} を実際の番号に置換
+      prompt = [
+        `Issue番号: #${issueNumber}`,
+        `設計書の出力先: specs/issue-${issueNumber}/design.md`,
+        "",
+        prompt,
+      ].join("\n");
+    }
+
+    const systemPrompt = issueNumber
+      ? config.systemPrompt.replaceAll("{ISSUE_NUMBER}", issueNumber)
+      : config.systemPrompt;
 
     try {
       let resultMsg: ResultMessage | null = null;
 
       for await (const message of query({
-        prompt: task.description,
+        prompt,
         options: {
           allowedTools: [...config.allowedTools],
           permissionMode: config.permissionMode,
           maxTurns: config.maxTurns,
           maxBudgetUsd: config.maxBudgetUsd,
           model: config.model,
+          systemPrompt: systemPrompt || undefined,
           cwd,
         },
       }) as AsyncIterable<{ type: string } & Record<string, unknown>>) {
@@ -63,18 +102,24 @@ export class Dispatcher {
 
       if (!resultMsg) {
         return {
-          status: "retry",
-          costUsd: 0,
-          turnsUsed: 0,
-          durationMs: 0,
-          error: "No result message received",
-          pushed: false,
+          status: "retry", costUsd: 0, turnsUsed: 0, durationMs: 0,
+          error: "No result message received", pushed: false,
         };
       }
 
       if (resultMsg.subtype === "success") {
-        // 2. 変更があればコミット・プッシュ
-        const commitMessage = `${task.taskType}: ${task.title} (${task.id})`;
+        // Reviewer の場合: design.md の存在を検証
+        let designFilePath: string | undefined;
+        if (task.taskType === "review" && issueNumber) {
+          const expectedPath = join(cwd, `specs/issue-${issueNumber}/design.md`);
+          if (existsSync(expectedPath)) {
+            designFilePath = `specs/issue-${issueNumber}/design.md`;
+          }
+        }
+
+        const commitMessage = task.taskType === "review"
+          ? `design: ${task.title} (#${issueNumber ?? task.id})`
+          : `${task.taskType}: ${task.title} (#${issueNumber ?? task.id})`;
         const pushed = this.worktreeManager.commitAndPush(role, task.id, commitMessage);
 
         return {
@@ -86,10 +131,10 @@ export class Dispatcher {
           structuredOutput: resultMsg.structured_output,
           pushed,
           branch: pushed ? branch : undefined,
+          designFilePath,
         };
       }
 
-      // Error subtypes → retry
       return {
         status: "retry",
         costUsd: resultMsg.total_cost_usd,
@@ -101,12 +146,8 @@ export class Dispatcher {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Unknown error";
       return {
-        status: "retry",
-        costUsd: 0,
-        turnsUsed: 0,
-        durationMs: 0,
-        error: message,
-        pushed: false,
+        status: "retry", costUsd: 0, turnsUsed: 0, durationMs: 0,
+        error: message, pushed: false,
       };
     }
   }

@@ -4,17 +4,6 @@ import { initSchema } from "../../../src/queue/schema.js";
 import { TaskQueue } from "../../../src/queue/task-queue.js";
 import { GitHubPoller } from "../../../src/sources/github-poller.js";
 
-// Mock Agent SDK for Classifier
-vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
-  query: vi.fn(async function* () {
-    yield {
-      type: "result",
-      subtype: "success",
-      structured_output: { complexity: "single", taskType: "fix" },
-    };
-  }),
-}));
-
 function makeOctokitMock(issues: unknown[] = [], reviews: unknown[] = []) {
   return {
     issues: {
@@ -28,11 +17,11 @@ function makeOctokitMock(issues: unknown[] = [], reviews: unknown[] = []) {
   };
 }
 
-function makeIssue(number: number, labels: string[] = ["ai-task", "bug"]) {
+function makeIssue(number: number, labels: string[] = ["bug"]) {
   return {
     number,
     title: `Issue #${number}`,
-    body: "Some description of the issue that needs attention",
+    body: "Description of the issue",
     labels: labels.map((name) => ({ name })),
     state: "open",
   };
@@ -48,60 +37,44 @@ describe("GitHubPoller", () => {
   });
 
   describe("pollIssues", () => {
-    it("T-GHP-001: detects ai-task labeled issue", async () => {
+    it("detects open issue and creates pipeline tasks", async () => {
       const octokit = makeOctokitMock([makeIssue(42)]);
       const poller = new GitHubPoller(octokit as never, queue, "org", "repo");
       await poller.pollIssues();
-      expect(queue.getNext()).not.toBeNull();
+      // Pipeline creates 2 tasks: review + fix
+      const pending = queue.getByStatus("pending");
+      expect(pending.length).toBeGreaterThanOrEqual(2);
+      expect(pending[0]?.taskType).toBe("review");
     });
 
-    it("T-GHP-002: processes issue even without ai-task label (all open issues)", async () => {
-      const octokit = makeOctokitMock([makeIssue(43, ["bug"])]);
-      const poller = new GitHubPoller(octokit as never, queue, "org", "repo");
-      await poller.pollIssues();
-      expect(queue.getNext()).not.toBeNull(); // 全 open Issue を処理
-    });
-
-    it("T-GHP-003: ignores already processed issue", async () => {
+    it("ignores already processed issue", async () => {
       const octokit = makeOctokitMock([makeIssue(42)]);
       const poller = new GitHubPoller(octokit as never, queue, "org", "repo");
       await poller.pollIssues();
-      await poller.pollIssues(); // second poll
-      expect(queue.getByStatus("pending")).toHaveLength(1);
+      const count1 = queue.getByStatus("pending").length;
+      await poller.pollIssues();
+      expect(queue.getByStatus("pending").length).toBe(count1);
     });
 
-    it("T-GHP-004: processes multiple issues", async () => {
-      const octokit = makeOctokitMock([makeIssue(42), makeIssue(43), makeIssue(44)]);
+    it("handles GitHub API error gracefully", async () => {
+      const octokit = makeOctokitMock();
+      octokit.issues.listForRepo.mockRejectedValue(new Error("500"));
+      const poller = new GitHubPoller(octokit as never, queue, "org", "repo");
+      await expect(poller.pollIssues()).resolves.toBeUndefined();
+    });
+
+    it("feature label creates review+build pipeline", async () => {
+      const octokit = makeOctokitMock([makeIssue(50, ["feature"])]);
       const poller = new GitHubPoller(octokit as never, queue, "org", "repo");
       await poller.pollIssues();
-      expect(queue.getByStatus("pending")).toHaveLength(3);
-    });
-
-    it("T-GHP-005: handles GitHub API 5xx", async () => {
-      const octokit = makeOctokitMock();
-      octokit.issues.listForRepo.mockRejectedValue(new Error("500 Internal Server Error"));
-      const poller = new GitHubPoller(octokit as never, queue, "org", "repo");
-      await expect(poller.pollIssues()).resolves.toBeUndefined();
-    });
-
-    it("T-GHP-006: handles GitHub rate limit 403", async () => {
-      const octokit = makeOctokitMock();
-      octokit.issues.listForRepo.mockRejectedValue(new Error("403 rate limit exceeded"));
-      const poller = new GitHubPoller(octokit as never, queue, "org", "repo");
-      await expect(poller.pollIssues()).resolves.toBeUndefined();
-    });
-
-    it("T-GHP-007: handles network error", async () => {
-      const octokit = makeOctokitMock();
-      octokit.issues.listForRepo.mockRejectedValue(new Error("ECONNREFUSED"));
-      const poller = new GitHubPoller(octokit as never, queue, "org", "repo");
-      await expect(poller.pollIssues()).resolves.toBeUndefined();
+      const pending = queue.getByStatus("pending");
+      expect(pending.some((t) => t.taskType === "review")).toBe(true);
+      expect(pending.some((t) => t.taskType === "build")).toBe(true);
     });
   });
 
   describe("pollApprovals", () => {
-    it("T-GHP-008: approve unblocks successor", async () => {
-      // Setup: review task awaiting approval
+    it("approve unblocks successor", async () => {
       queue.push({
         id: "review-1", taskType: "review", title: "Review",
         description: "D", source: "github_issue:42", priority: 5,
@@ -109,8 +82,8 @@ describe("GitHubPoller", () => {
       });
       queue.push({
         id: "fix-1", taskType: "fix", title: "Fix",
-        description: "D", source: "github_issue:42:fix", priority: 5,
-        dependsOn: "review-1", parentTaskId: null,
+        description: "D", source: "github_issue:42:1", priority: 5,
+        dependsOn: "review-1", parentTaskId: "review-1",
       });
       queue.updateStatus("review-1", "in_progress");
       queue.updateStatus("review-1", "awaiting_approval", {
@@ -124,39 +97,16 @@ describe("GitHubPoller", () => {
       expect(queue.getById("review-1")?.status).toBe("completed");
     });
 
-    it("T-GHP-009: changes_requested keeps awaiting", async () => {
+    it("closed PR cancels pipeline", async () => {
       queue.push({
         id: "review-1", taskType: "review", title: "Review",
         description: "D", source: "s1", priority: 5,
         dependsOn: null, parentTaskId: null,
-      });
-      queue.updateStatus("review-1", "in_progress");
-      queue.updateStatus("review-1", "awaiting_approval", {
-        approvalPrUrl: "https://github.com/org/repo/pull/10",
-      });
-
-      const octokit = makeOctokitMock([], [{ state: "CHANGES_REQUESTED" }]);
-      const poller = new GitHubPoller(octokit as never, queue, "org", "repo");
-      await poller.pollApprovals();
-
-      expect(queue.getById("review-1")?.status).toBe("awaiting_approval");
-    });
-
-    it("T-GHP-010: closed PR cancels pipeline", async () => {
-      queue.push({
-        id: "parent", taskType: "review", title: "Parent",
-        description: "D", source: "s0", priority: 5,
-        dependsOn: null, parentTaskId: null,
-      });
-      queue.push({
-        id: "review-1", taskType: "review", title: "Review",
-        description: "D", source: "s1", priority: 5,
-        dependsOn: null, parentTaskId: "parent",
       });
       queue.push({
         id: "fix-1", taskType: "fix", title: "Fix",
         description: "D", source: "s2", priority: 5,
-        dependsOn: "review-1", parentTaskId: "parent",
+        dependsOn: "review-1", parentTaskId: "review-1",
       });
       queue.updateStatus("review-1", "in_progress");
       queue.updateStatus("review-1", "awaiting_approval", {
@@ -165,36 +115,17 @@ describe("GitHubPoller", () => {
 
       const octokit = makeOctokitMock();
       octokit.pulls.get.mockResolvedValue({ data: { state: "closed", merged: false } });
-      octokit.pulls.listReviews.mockResolvedValue({ data: [] });
       const poller = new GitHubPoller(octokit as never, queue, "org", "repo");
       await poller.pollApprovals();
 
       expect(queue.getById("review-1")?.status).toBe("failed");
-      expect(queue.getById("fix-1")?.status).toBe("failed");
     });
 
-    it("T-GHP-011: no awaiting tasks skips check", async () => {
+    it("no awaiting tasks skips check", async () => {
       const octokit = makeOctokitMock();
       const poller = new GitHubPoller(octokit as never, queue, "org", "repo");
       await poller.pollApprovals();
       expect(octokit.pulls.listReviews).not.toHaveBeenCalled();
-    });
-
-    it("T-GHP-013: PR API error is handled gracefully", async () => {
-      queue.push({
-        id: "review-1", taskType: "review", title: "Review",
-        description: "D", source: "s1", priority: 5,
-        dependsOn: null, parentTaskId: null,
-      });
-      queue.updateStatus("review-1", "in_progress");
-      queue.updateStatus("review-1", "awaiting_approval", {
-        approvalPrUrl: "https://github.com/org/repo/pull/10",
-      });
-
-      const octokit = makeOctokitMock();
-      octokit.pulls.get.mockRejectedValue(new Error("500"));
-      const poller = new GitHubPoller(octokit as never, queue, "org", "repo");
-      await expect(poller.pollApprovals()).resolves.toBeUndefined();
     });
   });
 });

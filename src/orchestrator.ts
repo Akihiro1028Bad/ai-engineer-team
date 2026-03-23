@@ -67,7 +67,6 @@ export class Orchestrator {
 
     if (this.deps.githubPoller) {
       await this.deps.githubPoller.pollIssues();
-      await this.deps.githubPoller.pollComments();
       await this.deps.githubPoller.pollApprovals();
     }
 
@@ -120,13 +119,10 @@ export class Orchestrator {
       circuitBreaker.recordSuccess();
       budgetGuard.recordCost(result.costUsd);
 
-      // PR 作成フロー（変更がプッシュされた場合のみ）
+      // PR 作成フロー
       if (result.pushed && result.branch && resultCollector) {
-        const isPipeline = task.parentTaskId !== null;
-        const isReviewTask = task.taskType === "review";
-
-        if (isPipeline && isReviewTask) {
-          // パイプライン Reviewer → 設計PR作成 → awaiting_approval
+        if (task.taskType === "review") {
+          // Reviewer → 設計書PR → awaiting_approval
           const prResult = await resultCollector.createDesignPR(task, result.branch);
           if (prResult.success && prResult.prUrl) {
             queue.updateStatus(taskId, "awaiting_approval", {
@@ -140,23 +136,16 @@ export class Orchestrator {
             if (this.deps.githubPoller) {
               await this.deps.githubPoller.postResultToIssue(
                 taskId,
-                `📋 設計PRを作成しました。確認・承認をお願いします。\n\nPR: ${prResult.prUrl}\n\n${result.result ?? ""}`,
+                `📋 設計書PRを作成しました。確認・承認をお願いします。\n\nPR: ${prResult.prUrl}`,
               );
             }
-            return; // awaiting_approval に遷移したので completed にしない
+            return;
           }
         } else {
-          // 単体タスク or パイプライン後続 → 実装PR作成
-          const prMethod = isPipeline
-            ? resultCollector.createFinalPR([task], result.branch)
-            : resultCollector.createSinglePR(task, result.branch);
-          const prResult = await prMethod;
-
+          // Fixer/Builder → 実装PR → CI 監視
+          const prResult = await resultCollector.createSinglePR(task, result.branch);
           if (prResult.success && prResult.prUrl) {
             const prNum = this.extractPrNumber(prResult.prUrl);
-            logger.info({ taskId, prUrl: prResult.prUrl }, "PR created, starting CI monitoring");
-
-            // CI 監視開始
             queue.updateStatus(taskId, "completed", {
               result: result.result,
               costUsd: result.costUsd,
@@ -165,19 +154,17 @@ export class Orchestrator {
             if (prNum) {
               queue.updateStatus(taskId, "ci_checking", { prNumber: prNum });
             }
+            logger.info({ taskId, prUrl: prResult.prUrl }, "Implementation PR created, CI monitoring started");
 
             if (this.deps.githubPoller) {
               await this.deps.githubPoller.postResultToIssue(
                 taskId,
-                `✅ 修正が完了し、PRを作成しました。CI の結果を監視中です...\n\nPR: ${prResult.prUrl}\n\n${result.result ?? ""}`,
+                `✅ 実装PRを作成しました。CIの結果を監視中です。\n\nPR: ${prResult.prUrl}`,
               );
             }
-            return; // ci_checking に遷移したので以降の completed 更新をスキップ
+            return;
           }
         }
-      } else if (this.deps.githubPoller && result.result) {
-        // 変更なし（分析・質問のみ）→ Issue にコメント投稿
-        await this.deps.githubPoller.postResultToIssue(taskId, result.result);
       }
 
       // completed に更新（PR 未作成 or 変更なしの場合）
