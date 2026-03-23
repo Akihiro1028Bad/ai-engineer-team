@@ -191,9 +191,9 @@ export class Classifier {
           "isLarge が false の場合、scopes は空配列 [] にしてください。",
         ].join("\n"),
         options: {
-          model: "haiku",
+          model: "opus",
           maxTurns: 1,
-          maxBudgetUsd: 0.05,
+          maxBudgetUsd: 0.50,
           allowedTools: [],
           permissionMode: "dontAsk",
         },
