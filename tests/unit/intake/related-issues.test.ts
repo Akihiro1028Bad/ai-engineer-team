@@ -6,6 +6,9 @@ const logger = pino({ level: "silent" });
 
 function makeOctokit(issues: { number: number; title: string; body: string | null }[]) {
   return {
+    paginate: vi.fn().mockResolvedValue(
+      issues.map((i) => ({ ...i, labels: [] })),
+    ),
     issues: {
       listForRepo: vi.fn().mockResolvedValue({
         data: issues.map((i) => ({ ...i, labels: [] })),

@@ -53,7 +53,7 @@ export class PRFeedbackLearner {
     const params = repo ? [repo] : [];
 
     return this.db.prepare(`
-      SELECT feedback_type, agent_role, COUNT(*) as count
+      SELECT feedback_type AS feedbackType, agent_role AS agentRole, COUNT(*) as count
       FROM feedback_learnings
       ${where}
       GROUP BY feedback_type, agent_role

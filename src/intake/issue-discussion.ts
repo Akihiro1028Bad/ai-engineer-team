@@ -12,7 +12,7 @@ interface OctokitLike {
       owner: string;
       repo: string;
       issue_number: number;
-    }) => Promise<{ data: { body: string; user: { login: string } | null; created_at: string }[] }>;
+    }) => Promise<{ data: { body: string; user: { login: string; type?: string } | null; created_at: string }[] }>;
   };
   reactions: {
     createForIssue: (params: {
@@ -38,14 +38,13 @@ export interface DiscussionState {
 const MAX_ROUNDS = 3;
 const TIMEOUT_DAYS = 7;
 
-function isBot(comment: { body: string; user: { login: string } | null }): boolean {
+function isBot(comment: { body: string; user: { login: string; type?: string } | null }): boolean {
+  if (comment.user?.type === "Bot") return true;
   const login = comment.user?.login.toLowerCase() ?? "";
   if (!login) return true;
+  if (login.includes("[bot]")) return true;
   const BOT_LOGINS = ["vercel", "github-actions", "dependabot", "renovate"];
-  if (login.includes("bot") || login.includes("[bot]") || BOT_LOGINS.includes(login)) return true;
-  if (comment.body.includes("🤖")) return true;
-  if (comment.body.startsWith("@claude")) return true;
-  if (comment.body.startsWith("**Claude")) return true;
+  if (login.includes("bot") || BOT_LOGINS.includes(login)) return true;
   return false;
 }
 

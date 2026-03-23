@@ -14,6 +14,7 @@ vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
 
 function makeOctokitMock(issues: unknown[] = [], reviews: unknown[] = []) {
   return {
+    paginate: vi.fn().mockResolvedValue(issues),
     issues: {
       listForRepo: vi.fn().mockResolvedValue({ data: issues }),
       createComment: vi.fn().mockResolvedValue({}),

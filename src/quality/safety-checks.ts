@@ -3,7 +3,7 @@ import type { ValidationCheck } from "../types/validation.js";
 /** diff に含まれてはいけないパターン */
 const FORBIDDEN_PATTERNS = [
   { pattern: /(?:ANTHROPIC_API_KEY|GITHUB_TOKEN|SECRET|PASSWORD|PRIVATE_KEY)\s*=\s*['"]\S+/i, name: "秘密情報の漏洩" },
-  { pattern: /\.env\b/, name: ".env ファイルの追加" },
+  { pattern: /^\+\+\+ b\/\.env$/m, name: ".env ファイルの追加" },
   { pattern: /credentials?\.json/i, name: "認証情報ファイルの追加" },
   { pattern: /-----BEGIN (RSA |EC |DSA )?PRIVATE KEY-----/, name: "秘密鍵の漏洩" },
 ];

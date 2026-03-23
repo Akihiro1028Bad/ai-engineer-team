@@ -5,16 +5,24 @@ describe("WorktreeManager (Per-Task)", () => {
   let execMock: ReturnType<typeof vi.fn>;
   let manager: WorktreeManager;
 
+  /** Helper: join exec calls into readable strings for assertion */
+  function getExecCalls(): string[] {
+    return execMock.mock.calls.map((c: unknown[]) => {
+      const cmd = String(c[0]);
+      const args = Array.isArray(c[1]) ? (c[1] as string[]).join(" ") : "";
+      return `${cmd} ${args}`.trim();
+    });
+  }
+
   beforeEach(() => {
-    execMock = vi.fn();
+    execMock = vi.fn().mockReturnValue(Buffer.from(""));
     manager = new WorktreeManager("/home/user/worktrees", "/home/user/project", execMock);
   });
 
   it("creates worktree with taskId-based path and branch", () => {
-    execMock.mockReturnValue(Buffer.from(""));
     const path = manager.prepare("gh-42-0");
     expect(path).toBe("/home/user/worktrees/gh-42-0");
-    const cmds = execMock.mock.calls.map((c: unknown[]) => String(c[0]));
+    const cmds = getExecCalls();
     const branchCmd = cmds.find((c) => c.includes("agent/gh-42-0"));
     expect(branchCmd).toBeDefined();
   });
@@ -30,9 +38,8 @@ describe("WorktreeManager (Per-Task)", () => {
   });
 
   it("cleanup removes worktree and branch", () => {
-    execMock.mockReturnValue(Buffer.from(""));
     manager.cleanup("gh-42-0");
-    const cmds = execMock.mock.calls.map((c: unknown[]) => String(c[0]));
+    const cmds = getExecCalls();
     const removeCmd = cmds.find((c) => c.includes("worktree remove"));
     const deleteCmd = cmds.find((c) => c.includes("branch -D"));
     expect(removeCmd).toContain("gh-42-0");
@@ -47,7 +54,6 @@ describe("WorktreeManager (Per-Task)", () => {
   });
 
   it("each task gets its own directory", () => {
-    execMock.mockReturnValue(Buffer.from(""));
     const path1 = manager.prepare("gh-42-0");
     const path2 = manager.prepare("gh-43-0");
     expect(path1).toBe("/home/user/worktrees/gh-42-0");
@@ -56,9 +62,9 @@ describe("WorktreeManager (Per-Task)", () => {
   });
 
   it("commitAndPush uses taskId-based path", () => {
-    execMock.mockReturnValue(Buffer.from("M file.ts")); // hasDiff returns true
+    execMock.mockReturnValue(Buffer.from("M file.ts"));
     manager.commitAndPush("gh-42-0", "fix: something");
-    const cmds = execMock.mock.calls.map((c: unknown[]) => String(c[0]));
+    const cmds = getExecCalls();
     const addCmd = cmds.find((c) => c.includes("add -A"));
     expect(addCmd).toContain("worktrees/gh-42-0");
   });

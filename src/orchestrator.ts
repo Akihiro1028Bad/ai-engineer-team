@@ -86,10 +86,6 @@ export interface OrchestratorDeps {
 const PATTERN_UPDATE_INTERVAL = 100;
 /** Stale PR チェック間隔（10 tick ごと = 約5分） */
 const STALE_PR_CHECK_INTERVAL = 10;
-/** DAG 承認ゲート: ポーリング間隔（30秒） */
-const APPROVAL_POLL_INTERVAL_MS = 30_000;
-/** DAG 承認ゲート: タイムアウト（7日） */
-const APPROVAL_TIMEOUT_MS = 7 * 24 * 60 * 60 * 1000;
 
 export class Orchestrator {
   private running = false;
@@ -195,6 +191,25 @@ export class Orchestrator {
       return;
     }
 
+    // awaiting_approval タスクの承認チェック（1 tick につき 1 回ずつ）
+    if (this.deps.enableV3Planning) {
+      const awaitingTasks = queue.getByStatus("awaiting_approval");
+      for (const awaitingTask of awaitingTasks) {
+        const approved = await this.checkApprovalOnce(awaitingTask.id);
+        if (approved) {
+          logger.info({ taskId: awaitingTask.id }, "Design approved — resuming DAG execution");
+          queue.updateStatus(awaitingTask.id, "in_progress");
+          this.deps.statusEmitter?.emitProgress(awaitingTask.id, "設計が承認されました。実装を開始します。");
+
+          // Resume the v3 flow for this task
+          this.activeTasks += 1;
+          void this.executeV3Flow(awaitingTask.id).finally(() => {
+            this.activeTasks -= 1;
+          });
+        }
+      }
+    }
+
     // タスクディスパッチ
     while (this.activeTasks < maxConcurrent) {
       const task = queue.getNext();
@@ -213,9 +228,13 @@ export class Orchestrator {
         const poller = this.findPollerForTask(task.id);
         if (poller) void poller.reactToIssue(task.id, "eyes");
 
-        void this.executeV3Flow(task.id).finally(() => {
+        try {
+          void this.executeV3Flow(task.id).finally(() => {
+            this.activeTasks -= 1;
+          });
+        } catch {
           this.activeTasks -= 1;
-        });
+        }
       } else {
         const role = taskTypeToRole(task.taskType);
         const config = getAgentConfig(role);
@@ -226,9 +245,13 @@ export class Orchestrator {
         const poller = this.findPollerForTask(task.id);
         if (poller) void poller.reactToIssue(task.id, "eyes");
 
-        void this.executeV2Task(task.id, config).finally(() => {
+        try {
+          void this.executeV2Task(task.id, config).finally(() => {
+            this.activeTasks -= 1;
+          });
+        } catch {
           this.activeTasks -= 1;
-        });
+        }
       }
 
       if (maxConcurrent === 1) break;
@@ -422,18 +445,20 @@ export class Orchestrator {
         `バッチ ${batch.order + 1}/${schedule.batches.length} を実行中（${batch.nodes.length} ノード）`,
       );
 
-      for (const node of batch.nodes) {
-        if (!this.running) return;
+      if (!this.running) return;
 
-        if (!this.deps.agentRunner) {
-          logger.info({ taskId, nodeId: node.id }, "Falling back to v2.1 dispatcher for node");
-          continue;
-        }
+      if (!this.deps.agentRunner) {
+        logger.info({ taskId, batchOrder: batch.order }, "Falling back to v2.1 dispatcher for batch");
+        continue;
+      }
 
+      // Run batch nodes in parallel
+      const batchController = new AbortController();
+      const nodePromises = batch.nodes.map(async (node) => {
         // Per-Agent Circuit Breaker チェック
         if (this.deps.perAgentCircuitBreaker && !this.deps.perAgentCircuitBreaker.canExecute(node.agentRole, "v3")) {
           logger.warn({ taskId, nodeId: node.id, agent: node.agentRole }, "Per-agent circuit breaker OPEN — skipping node");
-          continue;
+          return null;
         }
 
         // Handoff コンテキスト: 前段ノードの結果を注入
@@ -445,13 +470,42 @@ export class Orchestrator {
           }
         }
 
+        if (!this.deps.agentRunner) {
+          throw new Error("AgentRunner not initialized");
+        }
         const result = await this.deps.agentRunner.run({
           taskId,
           planId: plan.taskId,
           node,
           cwd: ".",
           contextInsert,
+          signal: batchController.signal,
         });
+
+        if (result.status === "failed") {
+          batchController.abort();
+        }
+
+        return result;
+      });
+
+      const settledResults = await Promise.allSettled(nodePromises);
+
+      // Process results
+      let batchFailed = false;
+      for (let i = 0; i < settledResults.length; i++) {
+        const settled = settledResults[i];
+        const node = batch.nodes[i];
+        if (!settled || !node) continue;
+
+        if (settled.status === "rejected") {
+          logger.error({ taskId, nodeId: node.id, error: String(settled.reason) }, "Node promise rejected");
+          batchFailed = true;
+          continue;
+        }
+
+        const result = settled.value;
+        if (!result) continue; // Skipped by circuit breaker
 
         // Eval 記録
         this.deps.evalStore?.record({
@@ -492,16 +546,13 @@ export class Orchestrator {
 
         if (result.status === "failed") {
           logger.error({ taskId, nodeId: node.id, error: result.error }, "Node failed");
-          queue.retryTask(taskId);
-          this.deps.statusEmitter?.emitTaskFailed(taskId, result.error ?? "Node failed");
-          this.deps.circuitBreaker.recordFailure();
-          return;
+          batchFailed = true;
         }
 
         this.deps.budgetGuard.recordCost(result.costUsd);
 
         // === DAG 承認ゲート ===
-        // Designer ノード完了後: 設計 PR を作成し、承認されるまで DAG を一時停止
+        // Designer ノード完了後: 設計 PR を作成し、承認待ち状態にする
         if (node.agentRole === "designer" && result.pushed && result.branch) {
           const collector = this.findCollectorForTask(taskId);
           if (collector) {
@@ -525,21 +576,19 @@ export class Orchestrator {
                   );
                 }
 
-                // DAG を一時停止: 承認されるまでポーリングで待機
-                const approved = await this.waitForApproval(taskId, APPROVAL_POLL_INTERVAL_MS, APPROVAL_TIMEOUT_MS);
-                if (!approved) {
-                  logger.warn({ taskId }, "Design approval timed out or rejected — DAG aborted");
-                  this.deps.statusEmitter?.emitTaskFailed(taskId, "設計承認がタイムアウトまたは却下されました");
-                  return;
-                }
-
-                logger.info({ taskId }, "Design approved — resuming DAG execution");
-                queue.updateStatus(taskId, "in_progress");
-                this.deps.statusEmitter?.emitProgress(taskId, "設計が承認されました。実装を開始します。");
+                // Non-blocking: 承認チェックは tick() で行われる。ここでは return して待機。
+                return;
               }
             }
           }
         }
+      }
+
+      if (batchFailed) {
+        queue.retryTask(taskId);
+        this.deps.statusEmitter?.emitTaskFailed(taskId, "One or more nodes failed in batch");
+        this.deps.circuitBreaker.recordFailure();
+        return;
       }
     }
 
@@ -747,39 +796,31 @@ export class Orchestrator {
   // ========================================
 
   /**
-   * DAG 承認ゲート: タスクが承認されるまでポーリングで待機する。
-   * GitHubPoller.pollApprovals() がバックグラウンドで承認/却下を検出し、
-   * TaskQueue のステータスを更新するので、ここではステータスを監視するだけ。
+   * DAG 承認ゲート: 単一チェック（非ブロッキング）。
+   * tick() から `awaiting_approval` タスクに対して呼ばれる。
+   * 承認されていれば true を返し、まだなら false を返す（ブロックしない）。
    */
-  private async waitForApproval(taskId: string, intervalMs: number, timeoutMs: number): Promise<boolean> {
+  private async checkApprovalOnce(taskId: string): Promise<boolean> {
     const { queue, logger } = this.deps;
-    const startTime = Date.now();
 
-    while (this.running && (Date.now() - startTime) < timeoutMs) {
-      await this.sleep(intervalMs);
-
-      // ポーリング中も承認チェックを実行
-      if (this.deps.repoComponents) {
-        for (const repo of this.deps.repoComponents) {
-          try { await repo.githubPoller.pollApprovals(); } catch { /* non-critical */ }
-        }
-      } else if (this.deps.githubPoller) {
-        try { await this.deps.githubPoller.pollApprovals(); } catch { /* non-critical */ }
+    // 承認チェックを1回実行
+    if (this.deps.repoComponents) {
+      for (const repo of this.deps.repoComponents) {
+        try { await repo.githubPoller.pollApprovals(); } catch { /* non-critical */ }
       }
-
-      const task = queue.getById(taskId);
-      if (!task) return false;
-
-      // 承認された（pollApprovals が approveTask を呼び、status が変わる）
-      if (task.status !== "awaiting_approval") {
-        if (task.status === "failed") return false; // 却下
-        return true; // 承認済み（pending or in_progress に戻る）
-      }
-
-      logger.debug({ taskId, elapsed: Date.now() - startTime }, "Waiting for design approval...");
+    } else if (this.deps.githubPoller) {
+      try { await this.deps.githubPoller.pollApprovals(); } catch { /* non-critical */ }
     }
 
-    logger.warn({ taskId, timeoutMs }, "Design approval wait timed out");
+    const task = queue.getById(taskId);
+    if (!task) return false;
+
+    if (task.status !== "awaiting_approval") {
+      if (task.status === "failed") return false; // 却下
+      return true; // 承認済み
+    }
+
+    logger.debug({ taskId }, "Still waiting for design approval...");
     return false;
   }
 

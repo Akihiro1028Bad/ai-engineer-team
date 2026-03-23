@@ -46,9 +46,8 @@ export class Dispatcher {
     let cwd: string;
     let branch: string;
     if (existingBranch) {
-      // 設計→実装の同一ブランチ再利用（依存先タスクの worktree に入る）
-      const depTaskId = task.dependsOn ?? task.id;
-      cwd = this.worktreeManager.prepareExistingBranch(depTaskId, existingBranch);
+      // 設計→実装の同一ブランチ再利用（現タスク用の worktree にチェックアウト）
+      cwd = this.worktreeManager.prepareExistingBranch(task.id, existingBranch);
       branch = existingBranch;
     } else {
       cwd = this.worktreeManager.prepare(task.id);

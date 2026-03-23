@@ -1,11 +1,13 @@
 import type pino from "pino";
 
 interface OctokitLike {
+  paginate: <T>(method: unknown, params: Record<string, unknown>) => Promise<T[]>;
   issues: {
     listForRepo: (params: {
       owner: string;
       repo: string;
       state: string;
+      per_page?: number;
     }) => Promise<{ data: { number: number; title: string; body: string | null; labels: { name: string }[] }[] }>;
     createComment: (params: {
       owner: string;
@@ -67,8 +69,8 @@ export class RelatedIssueDetector {
     body: string,
   ): Promise<RelatedIssue[]> {
     try {
-      const { data: issues } = await this.octokit.issues.listForRepo({
-        owner: this.owner, repo: this.repo, state: "all",
+      const issues = await this.octokit.paginate<{ number: number; title: string; body: string | null; labels: { name: string }[] }>(this.octokit.issues.listForRepo, {
+        owner: this.owner, repo: this.repo, state: "all", per_page: 100,
       });
 
       const targetTokens = tokenize(`${title} ${body}`);
@@ -82,9 +84,8 @@ export class RelatedIssueDetector {
         const similarity = jaccardSimilarity(targetTokens, issueTokens);
 
         if (similarity >= SIMILARITY_THRESHOLD) {
-          const relationship = similarity >= 0.7 ? "duplicate"
-            : similarity >= 0.5 ? "related"
-            : "depends_on";
+          const relationship: RelatedIssue["relationship"] = similarity >= 0.7 ? "duplicate"
+            : "related";
 
           results.push({
             number: issue.number,

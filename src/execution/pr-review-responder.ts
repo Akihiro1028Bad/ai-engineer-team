@@ -214,7 +214,9 @@ export class PRReviewResponder {
 
     // コミット＆プッシュ
     const commitMessage = `fix: address review comment on ${item.comment.path ?? "PR"} (#${prNumber})`;
-    this.worktreeManager.commitAndPush(`pr-review-${prNumber}`, commitMessage);
+    if (this.worktreeManager.hasDiff(`pr-review-${prNumber}`)) {
+      this.worktreeManager.commitAndPush(`pr-review-${prNumber}`, commitMessage);
+    }
 
     // 対応済みコメント
     await this.octokit.issues.createComment({

@@ -94,7 +94,7 @@ export class AgentRunner {
         }
 
         // Handoff Report 自動生成・保存
-        if (this.handoffStore && node.dependsOn.length > 0) {
+        if (this.handoffStore) {
           this.saveHandoffReport(planId, node, result);
         }
 

@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-type ExecFn = (cmd: string) => Buffer;
+type ExecFn = (cmd: string, args: string[]) => Buffer;
 
 /**
  * Per-Task Worktree Manager
@@ -23,33 +23,33 @@ export class WorktreeManager {
 
     // 1. リモートの最新 main を取得
     try {
-      this.exec(`git -C ${this.projectDir} fetch origin main`);
+      this.exec("git", ["-C", this.projectDir, "fetch", "origin", "main"]);
     } catch {
       // fetch 失敗はネットワーク障害等 — 続行
     }
 
     // 2. 既存の worktree があれば削除（クリーンスタート）
     try {
-      this.exec(`git -C ${this.projectDir} worktree remove ${worktreePath} --force 2>/dev/null || true`);
+      this.exec("git", ["-C", this.projectDir, "worktree", "remove", worktreePath, "--force"]);
     } catch { /* ignore */ }
 
     // 3. 既存の同名ブランチがあれば削除
     try {
-      this.exec(`git -C ${this.projectDir} branch -D ${branch} 2>/dev/null || true`);
+      this.exec("git", ["-C", this.projectDir, "branch", "-D", branch]);
     } catch { /* ignore */ }
 
     // 4. worktree を作成（origin/main ベース）
     try {
-      this.exec(`git -C ${this.projectDir} worktree add ${worktreePath} -b ${branch} origin/main`);
+      this.exec("git", ["-C", this.projectDir, "worktree", "add", worktreePath, "-b", branch, "origin/main"]);
     } catch {
       // origin/main がない場合は HEAD から作成
       try {
-        this.exec(`git -C ${this.projectDir} worktree add ${worktreePath} -b ${branch} HEAD`);
+        this.exec("git", ["-C", this.projectDir, "worktree", "add", worktreePath, "-b", branch, "HEAD"]);
       } catch {
         // 最終手段: detached HEAD で作成
-        this.exec(`git -C ${this.projectDir} worktree add ${worktreePath} --detach`);
+        this.exec("git", ["-C", this.projectDir, "worktree", "add", worktreePath, "--detach"]);
         try {
-          this.exec(`git -C ${worktreePath} checkout -B ${branch}`);
+          this.exec("git", ["-C", worktreePath, "checkout", "-B", branch]);
         } catch { /* continue with detached */ }
       }
     }
@@ -66,29 +66,31 @@ export class WorktreeManager {
 
     // リモートの最新を取得
     try {
-      this.exec(`git -C ${this.projectDir} fetch origin ${branch} 2>/dev/null || true`);
+      this.exec("git", ["-C", this.projectDir, "fetch", "origin", branch]);
     } catch { /* ignore */ }
 
     // 既存 worktree があればそのままブランチ切り替え
     try {
-      this.exec(`git -C ${worktreePath} checkout ${branch}`);
-      this.exec(`git -C ${worktreePath} pull origin ${branch} 2>/dev/null || true`);
+      this.exec("git", ["-C", worktreePath, "checkout", branch]);
+      try {
+        this.exec("git", ["-C", worktreePath, "pull", "origin", branch]);
+      } catch { /* pull failure is non-fatal */ }
       return worktreePath;
     } catch { /* worktree が存在しない or チェックアウト失敗 */ }
 
     // worktree を新規作成してブランチをチェックアウト
     try {
-      this.exec(`git -C ${this.projectDir} worktree remove ${worktreePath} --force 2>/dev/null || true`);
+      this.exec("git", ["-C", this.projectDir, "worktree", "remove", worktreePath, "--force"]);
     } catch { /* ignore */ }
 
     try {
-      this.exec(`git -C ${this.projectDir} worktree add ${worktreePath} ${branch}`);
+      this.exec("git", ["-C", this.projectDir, "worktree", "add", worktreePath, branch]);
     } catch {
       try {
-        this.exec(`git -C ${this.projectDir} worktree add ${worktreePath} -b ${branch} origin/${branch}`);
+        this.exec("git", ["-C", this.projectDir, "worktree", "add", worktreePath, "-b", branch, `origin/${branch}`]);
       } catch {
         // フォールバック: 新規ブランチとして作成
-        this.exec(`git -C ${this.projectDir} worktree add ${worktreePath} -b ${branch} origin/main`);
+        this.exec("git", ["-C", this.projectDir, "worktree", "add", worktreePath, "-b", branch, "origin/main"]);
       }
     }
 
@@ -99,7 +101,7 @@ export class WorktreeManager {
   hasDiff(taskId: string): boolean {
     const worktreePath = this.getWorktreePath(taskId);
     try {
-      const result = this.exec(`git -C ${worktreePath} status --porcelain`);
+      const result = this.exec("git", ["-C", worktreePath, "status", "--porcelain"]);
       return result.toString().trim().length > 0;
     } catch {
       return false;
@@ -116,12 +118,12 @@ export class WorktreeManager {
       }
 
       // 現在のブランチ名を取得
-      const branchOutput = this.exec(`git -C ${worktreePath} rev-parse --abbrev-ref HEAD`).toString().trim();
+      const branchOutput = this.exec("git", ["-C", worktreePath, "rev-parse", "--abbrev-ref", "HEAD"]).toString().trim();
       const branch = branchOutput || this.getBranchName(taskId);
 
-      this.exec(`git -C ${worktreePath} add -A`);
-      this.exec(`git -C ${worktreePath} commit -m "${message.replace(/"/g, '\\"')}"`);
-      this.exec(`git -C ${worktreePath} push -u origin ${branch}`);
+      this.exec("git", ["-C", worktreePath, "add", "-A"]);
+      this.exec("git", ["-C", worktreePath, "commit", "-m", message]);
+      this.exec("git", ["-C", worktreePath, "push", "-u", "origin", branch]);
       return true;
     } catch {
       return false;
@@ -144,18 +146,18 @@ export class WorktreeManager {
     const branch = this.getBranchName(taskId);
 
     try {
-      this.exec(`git -C ${this.projectDir} worktree remove ${worktreePath} --force 2>/dev/null || true`);
+      this.exec("git", ["-C", this.projectDir, "worktree", "remove", worktreePath, "--force"]);
     } catch { /* best-effort */ }
 
     try {
-      this.exec(`git -C ${this.projectDir} branch -D ${branch} 2>/dev/null || true`);
+      this.exec("git", ["-C", this.projectDir, "branch", "-D", branch]);
     } catch { /* best-effort */ }
   }
 
   /** 全 worktree を一括削除（メンテナンス用） */
   cleanupAll(): void {
     try {
-      const output = this.exec(`git -C ${this.projectDir} worktree list --porcelain`).toString();
+      const output = this.exec("git", ["-C", this.projectDir, "worktree", "list", "--porcelain"]).toString();
       const paths = output.split("\n")
         .filter((line) => line.startsWith("worktree "))
         .map((line) => line.replace("worktree ", ""))
@@ -163,16 +165,16 @@ export class WorktreeManager {
 
       for (const path of paths) {
         try {
-          this.exec(`git -C ${this.projectDir} worktree remove ${path} --force`);
+          this.exec("git", ["-C", this.projectDir, "worktree", "remove", path, "--force"]);
         } catch { /* continue */ }
       }
 
       // agent/ ブランチを一括削除
       try {
-        const branches = this.exec(`git -C ${this.projectDir} branch --list "agent/*"`).toString().trim();
+        const branches = this.exec("git", ["-C", this.projectDir, "branch", "--list", "agent/*"]).toString().trim();
         for (const branch of branches.split("\n").map((b) => b.trim()).filter(Boolean)) {
           try {
-            this.exec(`git -C ${this.projectDir} branch -D ${branch}`);
+            this.exec("git", ["-C", this.projectDir, "branch", "-D", branch]);
           } catch { /* continue */ }
         }
       } catch { /* no agent branches */ }

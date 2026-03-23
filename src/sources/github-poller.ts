@@ -17,12 +17,14 @@ interface GitHubIssue {
 }
 
 interface OctokitLike {
+  paginate: <T>(method: unknown, params: Record<string, unknown>) => Promise<T[]>;
   issues: {
     listForRepo: (params: {
       owner: string;
       repo: string;
       labels?: string;
       state: string;
+      per_page?: number;
     }) => Promise<{ data: GitHubIssue[] }>;
     createComment: (params: {
       owner: string;
@@ -116,7 +118,7 @@ export class GitHubPoller {
 
   /** Issue に通知コメントを投稿する */
   async postResultToIssue(taskId: string, message: string): Promise<void> {
-    const match = /^gh-(\d+)-/.exec(taskId);
+    const match = /^gh-(\d+)/.exec(taskId);
     if (!match) return;
     const issueNumber = Number(match[1]);
     try {
@@ -133,8 +135,8 @@ export class GitHubPoller {
    */
   async pollIssues(): Promise<void> {
     try {
-      const { data: issues } = await this.octokit.issues.listForRepo({
-        owner: this.owner, repo: this.repo, state: "open",
+      const issues = await this.octokit.paginate<GitHubIssue>(this.octokit.issues.listForRepo, {
+        owner: this.owner, repo: this.repo, state: "open", per_page: 100,
       });
 
       // 待機中のディスカッションをチェック
@@ -219,6 +221,20 @@ export class GitHubPoller {
 
     // タスクキューに投入
     for (const { scopeId, classification } of result.pipelines) {
+      if (classification.complexity === "single") {
+        const taskId = `gh-${issue.number}-0`;
+        this.queue.push({
+          id: taskId,
+          taskType: classification.taskType,
+          title: issue.title,
+          description: issue.body ?? "",
+          source,
+          priority: triage.priority,
+          dependsOn: null,
+          parentTaskId: null,
+        });
+        continue;
+      }
       if (classification.complexity !== "pipeline") continue;
 
       const prefix = result.pipelines.length > 1
@@ -327,25 +343,27 @@ export class GitHubPoller {
 
       const allComments = [...issueComments, ...reviewComments];
 
-      let hasApprove = false;
-      let hasReject = false;
+      let lastApproveIndex = -1;
+      let lastRejectIndex = -1;
       let latestFeedback = "";
 
-      for (const comment of allComments) {
+      for (let i = 0; i < allComments.length; i++) {
+        const comment = allComments[i];
+        if (!comment) continue;
         if (isBot(comment)) continue;
 
         const body = comment.body.trim();
-        if (body === "承認") {
-          hasApprove = true;
-        } else if (body === "却下") {
-          hasReject = true;
+        if (body === "承認" || body.toLowerCase() === "approved" || body.toLowerCase() === "lgtm") {
+          lastApproveIndex = i;
+        } else if (body === "却下" || body.toLowerCase() === "rejected" || body.toLowerCase() === "changes requested") {
+          lastRejectIndex = i;
         } else if (body.length > 0) {
           latestFeedback = body;
         }
       }
 
-      if (hasApprove) return { type: "approve" };
-      if (hasReject) return { type: "reject" };
+      if (lastApproveIndex > lastRejectIndex) return { type: "approve" };
+      if (lastRejectIndex > lastApproveIndex) return { type: "reject" };
 
       if (latestFeedback) {
         const feedbackKey = `feedback:${prNumber}:${latestFeedback.slice(0, 50)}`;

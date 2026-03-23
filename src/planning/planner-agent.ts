@@ -3,6 +3,19 @@ import type pino from "pino";
 import type { AnalysisReport, ExecutionPlan } from "../types/execution-plan.js";
 import { ExecutionPlanSchema } from "../types/execution-plan.js";
 
+/** Extract the first balanced-brace JSON object from text */
+function extractFirstJson(text: string): string | null {
+  const start = text.indexOf("{");
+  if (start === -1) return null;
+  let depth = 0;
+  for (let i = start; i < text.length; i++) {
+    if (text[i] === "{") depth++;
+    else if (text[i] === "}") depth--;
+    if (depth === 0) return text.slice(start, i + 1);
+  }
+  return null;
+}
+
 interface PlannerInput {
   taskId: string;
   issueNumber: number;
@@ -109,10 +122,10 @@ export class PlannerAgent {
       }
 
       if (!structuredOutput && resultText) {
-        const jsonMatch = /\{[\s\S]*\}/.exec(resultText);
-        if (jsonMatch) {
+        const jsonStr = extractFirstJson(resultText);
+        if (jsonStr) {
           try {
-            structuredOutput = JSON.parse(jsonMatch[0]) as unknown;
+            structuredOutput = JSON.parse(jsonStr) as unknown;
           } catch { /* ignore */ }
         }
       }

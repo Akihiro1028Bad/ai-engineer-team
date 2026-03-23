@@ -2,6 +2,19 @@ import { z } from "zod";
 
 import type { Classification, SubTaskDef, TaskType } from "../types.js";
 
+/** Extract the first balanced-brace JSON object from text */
+function extractFirstJson(text: string): string | null {
+  const start = text.indexOf("{");
+  if (start === -1) return null;
+  let depth = 0;
+  for (let i = start; i < text.length; i++) {
+    if (text[i] === "{") depth++;
+    else if (text[i] === "}") depth--;
+    if (depth === 0) return text.slice(start, i + 1);
+  }
+  return null;
+}
+
 interface Issue {
   number: number;
   title: string;
@@ -150,14 +163,19 @@ export class ClassifierV3 {
     // Haiku で分類（低コスト: ~$0.01）
     const classificationOutput = await this.classifyWithHaiku(issue);
 
-    const implType = classificationOutput?.taskType
+    let implType = classificationOutput?.taskType
       ?? detectTaskType(issue.labels);
     const confidence = classificationOutput?.confidence ?? 0.5;
 
     // 信頼度が低い場合は Sonnet にフォールバック
-    const effectiveConfidence = confidence < CONFIDENCE_THRESHOLD
-      ? await this.reclassifyWithSonnet(issue, confidence)
-      : confidence;
+    let effectiveConfidence = confidence;
+    if (confidence < CONFIDENCE_THRESHOLD) {
+      const sonnetResult = await this.reclassifyWithSonnet(issue, confidence);
+      effectiveConfidence = sonnetResult.confidence;
+      if (sonnetResult.taskType) {
+        implType = sonnetResult.taskType;
+      }
+    }
 
     // unclear の場合は質問を返す
     if (classificationOutput?.complexity === "unclear" && classificationOutput.question) {
@@ -283,10 +301,10 @@ export class ClassifierV3 {
       }
 
       if (!structuredOutput && resultText) {
-        const jsonMatch = /\{[\s\S]*\}/.exec(resultText);
-        if (jsonMatch) {
+        const jsonStr = extractFirstJson(resultText);
+        if (jsonStr) {
           try {
-            structuredOutput = JSON.parse(jsonMatch[0]) as unknown;
+            structuredOutput = JSON.parse(jsonStr) as unknown;
           } catch { /* ignore parse error */ }
         }
       }
@@ -304,7 +322,7 @@ export class ClassifierV3 {
   private async reclassifyWithSonnet(
     issue: Issue,
     originalConfidence: number,
-  ): Promise<number> {
+  ): Promise<{ taskType: TaskType | null; confidence: number }> {
     try {
       const { query } = await import("@anthropic-ai/claude-agent-sdk");
 
@@ -347,21 +365,27 @@ export class ClassifierV3 {
       }
 
       if (!structuredOutput && resultText) {
-        const jsonMatch = /\{[\s\S]*\}/.exec(resultText);
-        if (jsonMatch) {
-          try { structuredOutput = JSON.parse(jsonMatch[0]) as unknown; } catch { /* ignore */ }
+        const jsonStr = extractFirstJson(resultText);
+        if (jsonStr) {
+          try { structuredOutput = JSON.parse(jsonStr) as unknown; } catch { /* ignore */ }
         }
       }
 
       if (typeof structuredOutput === "object" && structuredOutput !== null) {
-        const conf = (structuredOutput as { confidence?: number }).confidence;
+        const obj = structuredOutput as { taskType?: string; confidence?: number };
+        const conf = obj.confidence;
+        const tt = obj.taskType;
         if (typeof conf === "number" && conf > originalConfidence) {
-          return conf;
+          const validTypes = ["fix", "build", "document"] as const;
+          const taskType = typeof tt === "string" && (validTypes as readonly string[]).includes(tt)
+            ? (tt as TaskType)
+            : null;
+          return { taskType, confidence: conf };
         }
       }
     } catch { /* Sonnet fallback failed, use original */ }
 
-    return originalConfidence;
+    return { taskType: null, confidence: originalConfidence };
   }
 
   /** Haiku でスコープ分析（リトライ付き） */
@@ -463,10 +487,10 @@ export class ClassifierV3 {
       }
 
       if (!structuredOutput && resultText) {
-        const jsonMatch = /\{[\s\S]*\}/.exec(resultText);
-        if (jsonMatch) {
+        const jsonStr = extractFirstJson(resultText);
+        if (jsonStr) {
           try {
-            structuredOutput = JSON.parse(jsonMatch[0]) as unknown;
+            structuredOutput = JSON.parse(jsonStr) as unknown;
           } catch { /* ignore parse error */ }
         }
       }

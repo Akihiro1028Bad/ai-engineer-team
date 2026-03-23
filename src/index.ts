@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 
 import Database from "better-sqlite3";
@@ -144,7 +144,7 @@ async function main(): Promise<void> {
     const worktreeManager = new WorktreeManager(
       repoConfig.worktreeDir,
       repoConfig.projectDir,
-      (cmd: string) => execSync(cmd),
+      (cmd: string, args: string[]) => execFileSync(cmd, args),
     );
 
     const dispatcher = new Dispatcher(
@@ -284,6 +284,7 @@ async function main(): Promise<void> {
     dryRunDefault: config.dryRunDefault,
   }, "AI Agent Orchestrator v3.0 starting");
   await orchestrator.start();
+  db.close();
 }
 
 void main();

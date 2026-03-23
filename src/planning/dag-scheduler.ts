@@ -97,8 +97,8 @@ export class DAGScheduler {
       );
     }
 
-    // クリティカルパス計算（最長パス）
-    const criticalPath = this.computeCriticalPath(nodes, adjacency);
+    // クリティカルパス計算（最長パス）— バッチをトポロジカル順序として使用
+    const criticalPath = this.computeCriticalPath(nodes, batches);
 
     return {
       batches,
@@ -107,67 +107,52 @@ export class DAGScheduler {
     };
   }
 
-  /** 最長パス（クリティカルパス）を計算 */
+  /** 最長パス（クリティカルパス）を計算（DAG 緩和法） */
   private computeCriticalPath(
     nodes: PlanNode[],
-    adjacency: Map<string, string[]>,
+    batches: ExecutionBatch[],
   ): string[] {
     const dist = new Map<string, number>();
     const prev = new Map<string, string | null>();
 
+    // Initialize distances
     for (const node of nodes) {
       dist.set(node.id, 0);
       prev.set(node.id, null);
     }
 
-    // トポロジカル順に最長距離を計算
-    // ノードの estimatedCostUsd を重みとして使用
-    const nodeMap = new Map<string, PlanNode>();
-    for (const node of nodes) {
-      nodeMap.set(node.id, node);
-    }
-
-    // ソース（依存なし）から開始
-    const sources = nodes.filter((n) => n.dependsOn.length === 0);
-    for (const source of sources) {
-      dist.set(source.id, source.estimatedCostUsd);
-    }
-
-    // BFS で最長距離を伝播
-    const visited = new Set<string>();
-    const queue = sources.map((n) => n.id);
-
-    while (queue.length > 0) {
-      const nodeId = queue.shift();
-      if (nodeId === undefined) continue;
-      if (visited.has(nodeId)) continue;
-      visited.add(nodeId);
-
-      const currentDist = dist.get(nodeId) ?? 0;
-
-      for (const neighbor of adjacency.get(nodeId) ?? []) {
-        const neighborNode = nodeMap.get(neighbor);
-        const newDist = currentDist + (neighborNode?.estimatedCostUsd ?? 0);
-        if (newDist > (dist.get(neighbor) ?? 0)) {
-          dist.set(neighbor, newDist);
-          prev.set(neighbor, nodeId);
+    // Process in topological order (batches are already in topo order)
+    // For each node, relax edges to all successors
+    for (const batch of batches) {
+      for (const node of batch.nodes) {
+        const nodeDist = dist.get(node.id) ?? 0;
+        const nodeWeight = node.estimatedDurationMs ?? 600_000; // default 10 min in ms
+        // Find successor nodes (nodes that depend on this one)
+        for (const successor of nodes) {
+          if (successor.dependsOn.includes(node.id)) {
+            const newDist = nodeDist + nodeWeight;
+            if (newDist > (dist.get(successor.id) ?? 0)) {
+              dist.set(successor.id, newDist);
+              prev.set(successor.id, node.id);
+            }
+          }
         }
-        queue.push(neighbor);
       }
     }
 
-    // 最長距離のノードからバックトラック
+    // Find the node with maximum distance (end of critical path)
+    let maxNode = nodes[0]?.id ?? "";
     let maxDist = 0;
-    let endNode = "";
     for (const [nodeId, d] of dist) {
       if (d > maxDist) {
         maxDist = d;
-        endNode = nodeId;
+        maxNode = nodeId;
       }
     }
 
+    // Trace back the critical path
     const path: string[] = [];
-    let current: string | null = endNode;
+    let current: string | null | undefined = maxNode;
     while (current) {
       path.unshift(current);
       current = prev.get(current) ?? null;
