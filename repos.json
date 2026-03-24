@@ -1,0 +1,18 @@
+[
+  {
+    "id": "goukon-kanri",
+    "githubRepo": "Akihiro1028Bad/goukon-kanri",
+    "projectDir": "/Users/tsutsumi.akihiro/dev/goukon-kanri",
+    "worktreeDir": "/Users/tsutsumi.akihiro/dev/worktrees/goukon-kanri",
+    "enabled": true,
+    "maxConcurrent": 1
+  },
+  {
+    "id": "ai-engineer-team",
+    "githubRepo": "Akihiro1028Bad/ai-engineer-team",
+    "projectDir": "/Users/tsutsumi.akihiro/dev/ai-engineer-team",
+    "worktreeDir": "/Users/tsutsumi.akihiro/dev/worktrees/ai-engineer-team",
+    "enabled": true,
+    "maxConcurrent": 1
+  }
+]

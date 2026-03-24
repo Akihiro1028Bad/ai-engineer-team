@@ -1,0 +1,59 @@
+name: Claude AI Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  issue_comment:
+    types: [created]
+
+jobs:
+  claude-review:
+    if: |
+      (github.event_name == 'pull_request') ||
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Claude Code Action
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          model: sonnet
+          timeout_minutes: 10
+          custom_instructions: |
+            あなたはシニアソフトウェアエンジニアです。以下の観点で徹底的にレビューしてください。
+
+            【最重要：バグ検出】
+            - ロジックの誤り（off-by-one、条件分岐の漏れ、null/undefined の未処理）
+            - 非同期処理のバグ（Promise の放置、race condition、デッドロック）
+            - エッジケースの未処理（空配列、空文字、0、負数、巨大入力）
+            - 型の不整合（実行時に型が合わないケース、as キャストによる嘘）
+            - リソースリーク（未クローズのファイル、DB接続、タイマー、イベントリスナー）
+
+            【セキュリティ】
+            - 秘密情報の漏洩（トークン、パスワード、API キーがコードやログに含まれていないか）
+            - インジェクション（コマンドインジェクション、パストラバーサル）
+            - 入力値の未検証
+
+            【型安全性】
+            - any の使用禁止（unknown + 型ガードで代替）
+            - Non-null アサーション (!) の禁止
+            - 不適切な型キャスト (as)
+
+            【コード品質】
+            - CLAUDE.md のコーディング規約への準拠
+            - エラーハンドリング（境界での try/catch、カスタムエラークラス使用）
+            - テストカバレッジ（新規コードにテストがあるか）
+            - パフォーマンス（不要な await の直列化、N+1 クエリ）
+
+            バグや問題を見つけたら、必ず具体的な修正案をコード付きで提示してください。
+            日本語でレビューコメントを書いてください。
