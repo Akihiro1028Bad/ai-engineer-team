@@ -70,9 +70,12 @@ export class CIMonitor {
     await this.checkFixingTasks();
 
     const tasks = this.queue.getByStatus("ci_checking");
+    const myRepo = `${this.owner}/${this.repo}`;
 
     for (const task of tasks) {
       if (!task.prNumber) continue;
+      // 自リポジトリのタスクのみ処理する（マルチリポ対応）
+      if (task.repo && task.repo !== myRepo) continue;
 
       try {
         // PR の head commit SHA を取得
@@ -292,7 +295,8 @@ export class CIMonitor {
         source,
         priority: 1,
         dependsOn: null,
-        parentTaskId: null,
+        parentTaskId,
+        contextFile: prBranch || null,
         repo: `${this.owner}/${this.repo}`,
       },
       {
@@ -315,7 +319,8 @@ export class CIMonitor {
         source: `${source}:impl`,
         priority: 1,
         dependsOn: reviewTaskId,
-        parentTaskId: null,
+        parentTaskId,
+        contextFile: prBranch || null,
         repo: `${this.owner}/${this.repo}`,
       },
     ]);

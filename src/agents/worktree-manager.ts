@@ -3,6 +3,12 @@ import { existsSync, rmSync } from "node:fs";
 
 type ExecFn = (cmd: string, args: string[]) => Buffer;
 
+export interface CommitAndPushResult {
+  status: "no_diff" | "pushed" | "commit_failed" | "push_failed";
+  error?: string;
+  branch?: string;
+}
+
 /**
  * Per-Task Worktree Manager
  *
@@ -135,26 +141,35 @@ export class WorktreeManager {
     }
   }
 
-  /** worktree の変更を git add → commit → push する */
-  commitAndPush(taskId: string, message: string): boolean {
+  /** worktree の変更を git add → commit → push する。targetBranch を指定するとリモートの別ブランチにpushする */
+  commitAndPush(taskId: string, message: string, targetBranch?: string): CommitAndPushResult {
     const worktreePath = this.getWorktreePath(taskId);
 
+    if (!this.hasDiff(taskId)) {
+      return { status: "no_diff" };
+    }
+
+    // 現在のブランチ名を取得
+    const branchOutput = this.exec("git", ["-C", worktreePath, "rev-parse", "--abbrev-ref", "HEAD"]).toString().trim();
+    const branch = branchOutput || this.getBranchName(taskId);
+    const pushBranch = targetBranch ?? branch;
+
     try {
-      if (!this.hasDiff(taskId)) {
-        return false; // 変更なし
-      }
-
-      // 現在のブランチ名を取得
-      const branchOutput = this.exec("git", ["-C", worktreePath, "rev-parse", "--abbrev-ref", "HEAD"]).toString().trim();
-      const branch = branchOutput || this.getBranchName(taskId);
-
       this.exec("git", ["-C", worktreePath, "add", "-A"]);
       this.exec("git", ["-C", worktreePath, "commit", "-m", message]);
-      this.exec("git", ["-C", worktreePath, "push", "-u", "origin", branch]);
-      return true;
-    } catch {
-      return false;
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      return { status: "commit_failed", error: msg };
     }
+
+    try {
+      this.exec("git", ["-C", worktreePath, "push", "-u", "origin", `${branch}:${pushBranch}`]);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      return { status: "push_failed", error: msg, branch: pushBranch };
+    }
+
+    return { status: "pushed", branch: pushBranch };
   }
 
   /** ブランチ名を返す */

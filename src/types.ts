@@ -59,8 +59,10 @@ export const CreateTaskInputSchema = z.object({
   parentTaskId: z.string().nullable().optional().default(null),
   /** リポジトリ識別子 (owner/repo 形式) */
   repo: z.string().nullable().optional().default(null),
+  /** CI修正タスク用: 元PRのブランチ名 */
+  contextFile: z.string().nullable().optional().default(null),
 });
-export type CreateTaskInput = z.infer<typeof CreateTaskInputSchema>;
+export type CreateTaskInput = z.input<typeof CreateTaskInputSchema>;
 
 // === Task (full DB model) ===
 

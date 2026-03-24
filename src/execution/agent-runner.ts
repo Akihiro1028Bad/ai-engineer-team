@@ -92,8 +92,8 @@ export class AgentRunner {
         // コミット＆プッシュ（実装系エージェントの場合）
         if (this.shouldCommit(node.agentRole)) {
           const commitMessage = `${node.agentRole}: ${taskId} node ${node.id}`;
-          const pushed = this.worktreeManager.commitAndPush(taskId, commitMessage);
-          result.pushed = pushed;
+          const commitResult = this.worktreeManager.commitAndPush(taskId, commitMessage);
+          result.pushed = commitResult.status === "pushed";
         }
 
         // Handoff Report 自動生成・保存

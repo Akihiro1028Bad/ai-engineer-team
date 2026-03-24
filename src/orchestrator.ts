@@ -39,6 +39,8 @@ export interface RepoRef {
   repoId: string;
   /** "owner/repo" 形式のリポジトリ識別子 */
   githubRepo?: string;
+  /** プロジェクトディレクトリの絶対パス */
+  projectDir: string;
   githubPoller: GitHubPoller;
   resultCollector: ResultCollector;
   ciMonitor: CIMonitor;
@@ -147,6 +149,22 @@ export class Orchestrator {
 
     this.tickCount++;
 
+    // 定期的にstuckタスクを検出・回復（10 tick ごと = 約5分）
+    if (this.tickCount % 10 === 0) {
+      const recovered = queue.recoverStuckTasks();
+      if (recovered > 0) {
+        logger.warn({ recovered }, "Recovered stuck tasks");
+      }
+    }
+
+    // 長期間承認待ちのタスクを回収（100 tick ごと）
+    if (this.tickCount % 100 === 0) {
+      const stale = queue.recoverStaleApprovals();
+      if (stale > 0) {
+        logger.warn({ stale }, "Recovered stale awaiting_approval tasks");
+      }
+    }
+
     cronScheduler.checkAndCreateTasks(new Date());
 
     // マルチリポ対応: 全リポジトリの GitHub をポーリング
@@ -193,14 +211,17 @@ export class Orchestrator {
       return;
     }
 
-    // awaiting_approval タスクの承認チェック（1 tick につき 1 回ずつ）
+    // awaiting_approval タスクの承認チェック（pollApprovals() は上で既に実行済み）
     const awaitingTasks = queue.getByStatus("awaiting_approval");
     for (const awaitingTask of awaitingTasks) {
-      const approved = await this.checkApprovalOnce(awaitingTask.id);
+      const approved = this.checkApprovalOnce(awaitingTask.id);
       if (approved) {
+        // pollApprovals() で既にステータスが変わっている場合は再更新しない
+        const current = queue.getById(awaitingTask.id);
+        if (current && current.status === "awaiting_approval") {
+          queue.updateStatus(awaitingTask.id, "completed");
+        }
         logger.info({ taskId: awaitingTask.id }, "Design approved — resuming execution");
-        // 承認された review タスクを completed にして、依存する次タスク（fixer/builder）を解放
-        queue.updateStatus(awaitingTask.id, "completed");
         this.deps.statusEmitter?.emitProgress(awaitingTask.id, "設計が承認されました。次のタスクを開始します。");
       }
     }
@@ -223,13 +244,17 @@ export class Orchestrator {
         const poller = this.findPollerForTask(task.id);
         if (poller) void poller.reactToIssue(task.id, "eyes");
 
-        try {
-          void this.executeV3Flow(task.id).finally(() => {
+        this.executeV3Flow(task.id)
+          .catch((error: unknown) => {
+            const msg = error instanceof Error ? error.message : "Unknown error";
+            logger.error({ taskId: task.id, error: msg }, "V3 flow unhandled error — marking task failed");
+            try { queue.failTask(task.id, msg); } catch (e: unknown) {
+              logger.error({ taskId: task.id, error: e }, "Failed to mark task as failed");
+            }
+          })
+          .finally(() => {
             this.activeTasks -= 1;
           });
-        } catch {
-          this.activeTasks -= 1;
-        }
       } else {
         const role = taskTypeToRole(task.taskType);
         const config = getAgentConfig(role);
@@ -240,13 +265,17 @@ export class Orchestrator {
         const poller = this.findPollerForTask(task.id);
         if (poller) void poller.reactToIssue(task.id, "eyes");
 
-        try {
-          void this.executeV2Task(task.id, config).finally(() => {
+        this.executeV2Task(task.id, config)
+          .catch((error: unknown) => {
+            const msg = error instanceof Error ? error.message : "Unknown error";
+            logger.error({ taskId: task.id, error: msg }, "V2 task unhandled error — marking task failed");
+            try { queue.failTask(task.id, msg); } catch (e: unknown) {
+              logger.error({ taskId: task.id, error: e }, "Failed to mark task as failed");
+            }
+          })
+          .finally(() => {
             this.activeTasks -= 1;
           });
-        } catch {
-          this.activeTasks -= 1;
-        }
       }
 
       if (maxConcurrent === 1) break;
@@ -622,14 +651,21 @@ export class Orchestrator {
   // ========================================
 
   private async executeV2Task(taskId: string, config: AgentConfig): Promise<void> {
-    const { queue, dispatcher, circuitBreaker, budgetGuard, slackNotifier, logger } = this.deps;
+    const { queue, circuitBreaker, budgetGuard, slackNotifier, logger } = this.deps;
     const task = queue.getById(taskId);
     if (!task) return;
 
-    // Fixer/Builder は Reviewer と同じブランチを使う
+    // リポジトリ固有の dispatcher を使用（マルチリポ対応）
+    const repoRef = this.findRepoForTask(taskId);
+    const dispatcher = repoRef?.dispatcher ?? this.deps.dispatcher;
+
+    // ブランチ選択: contextFile（CI修正用）を優先、なければ dependsOn から導出
     let existingBranch: string | undefined;
-    if (task.taskType !== "review" && task.dependsOn) {
-      // Per-Task: agent/{dependsOn} ブランチを再利用
+    if (task.contextFile) {
+      // CI fix tasks: contextFile に元PRブランチ名が入っている
+      existingBranch = task.contextFile;
+    } else if (task.taskType !== "review" && task.dependsOn) {
+      // 通常パイプライン: agent/{dependsOn} ブランチを再利用
       existingBranch = `agent/${task.dependsOn}`;
     }
 
@@ -675,7 +711,14 @@ export class Orchestrator {
         }
       }
 
-      // 実装系タスクで pushed: false の場合はリトライ
+      // push 失敗の場合はリトライではなく即失敗（再実行しても同じ結果になる可能性が高い）
+      if (result.pushError) {
+        logger.error({ taskId, pushError: result.pushError }, "Git push failed — marking task failed");
+        queue.failTask(taskId, `Git push failed: ${result.pushError}`);
+        return;
+      }
+
+      // 実装系タスクで pushed: false（差分なし）の場合はリトライ
       const isImplementation = ["fixer", "builder"].includes(config.role);
       if (isImplementation && !result.pushed && task.retryCount < 2) {
         logger.warn({ taskId, agent: config.role, retryCount: task.retryCount }, "Implementation produced no changes — retrying");
@@ -684,6 +727,18 @@ export class Orchestrator {
           costUsd: result.costUsd,
           turnsUsed: result.turnsUsed,
         });
+        return;
+      }
+
+      // CI修正タスク: PR作成・承認待ちをスキップ（元PRブランチに直接push済み）
+      if (result.pushed && this.isCIFixTask(task.id)) {
+        queue.updateStatus(taskId, "completed", {
+          result: result.result,
+          costUsd: result.costUsd,
+          turnsUsed: result.turnsUsed,
+        });
+        logger.info({ taskId, branch: result.branch }, "CI fix task pushed to existing branch");
+        this.deps.statusEmitter?.emitTaskCompleted(taskId, { branch: result.branch });
         return;
       }
 
@@ -809,18 +864,10 @@ export class Orchestrator {
    * tick() から `awaiting_approval` タスクに対して呼ばれる。
    * 承認されていれば true を返し、まだなら false を返す（ブロックしない）。
    */
-  private async checkApprovalOnce(taskId: string): Promise<boolean> {
+  private checkApprovalOnce(taskId: string): boolean {
     const { queue, logger } = this.deps;
 
-    // 承認チェックを1回実行
-    if (this.deps.repoComponents) {
-      for (const repo of this.deps.repoComponents) {
-        try { await repo.githubPoller.pollApprovals(); } catch { /* non-critical */ }
-      }
-    } else if (this.deps.githubPoller) {
-      try { await this.deps.githubPoller.pollApprovals(); } catch { /* non-critical */ }
-    }
-
+    // pollApprovals() は tick() 冒頭で既に呼ばれているため、ここでは DB 状態のみ確認する
     const task = queue.getById(taskId);
     if (!task) return false;
 
@@ -833,6 +880,11 @@ export class Orchestrator {
     return false;
   }
 
+  /** CI修正タスクかどうかを判定する */
+  private isCIFixTask(taskId: string): boolean {
+    return taskId.includes("-cifix-");
+  }
+
   /** タスク ID からリポジトリの RepoRef を特定する */
   private findRepoForTask(taskId: string): RepoRef | undefined {
     if (!this.deps.repoComponents || this.deps.repoComponents.length === 0) {
@@ -842,13 +894,14 @@ export class Orchestrator {
     // タスクの repo フィールドで特定 (repo は "owner/repo" 形式)
     const task = this.deps.queue.getById(taskId);
     if (task?.repo) {
+      const repoName = task.repo.includes("/") ? task.repo.split("/")[1] : task.repo;
       const match = this.deps.repoComponents.find((rc) =>
-        rc.githubRepo === task.repo || rc.repoId === task.repo,
+        rc.githubRepo === task.repo || rc.repoId === task.repo || rc.repoId === repoName,
       );
       if (match) return match;
     }
 
-    // フォールバック: 最初のリポジトリ
+    // フォールバック: 最初のリポジトリ（repo フィールドが null の場合のみ）
     return this.deps.repoComponents[0];
   }
 

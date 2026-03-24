@@ -76,7 +76,6 @@ async function main(): Promise<void> {
   const octokit = new Octokit({ auth: config.githubToken });
   const queue = new TaskQueue(db);
   const slackNotifier = new SlackNotifier(config.slackWebhookUrl);
-  const cronScheduler = new CronScheduler(queue);
   const statusEmitter = new StatusEmitter();
   const _hierarchicalBudget = config.dailyBudgetUsd
     ? new HierarchicalBudgetGuard(config.dailyBudgetUsd, logger)
@@ -106,6 +105,18 @@ async function main(): Promise<void> {
     });
   });
 
+  // マルチリポジトリ設定の読み込み
+  const repos = loadReposConfig(config.reposJsonPath, {
+    githubRepo: config.githubRepo,
+    projectDir: config.projectDir,
+    worktreeDir: config.worktreeDir,
+  });
+
+  logger.info({ repoCount: repos.length, repos: repos.map((r) => r.id) }, "Repositories loaded");
+
+  const defaultCronRepo = repos.length === 1 ? repos[0]!.githubRepo : null;
+  const cronScheduler = new CronScheduler(queue, defaultCronRepo);
+
   // Prompt Optimizer 月次 Cron 登録（毎月1日 04:00）
   const promptOptimizer = new PromptOptimizer(evalStore, feedbackLearner, logger);
   let lastPromptOptMonth = -1;
@@ -127,15 +138,6 @@ async function main(): Promise<void> {
       });
     }
   });
-
-  // マルチリポジトリ設定の読み込み
-  const repos = loadReposConfig(config.reposJsonPath, {
-    githubRepo: config.githubRepo,
-    projectDir: config.projectDir,
-    worktreeDir: config.worktreeDir,
-  });
-
-  logger.info({ repoCount: repos.length, repos: repos.map((r) => r.id) }, "Repositories loaded");
 
   // リポジトリごとのコンポーネントを初期化
   const repoComponents: RepoComponents[] = repos.map((repoConfig) => {
@@ -244,6 +246,7 @@ async function main(): Promise<void> {
     repoComponents: repoComponents.map((rc) => ({
       repoId: rc.repoConfig.id,
       githubRepo: rc.repoConfig.githubRepo,
+      projectDir: rc.repoConfig.projectDir,
       githubPoller: rc.githubPoller,
       resultCollector: rc.resultCollector,
       ciMonitor: rc.ciMonitor,

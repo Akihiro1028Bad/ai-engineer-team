@@ -77,8 +77,8 @@ export class TaskQueue {
 
   constructor(private readonly db: Database.Database) {
     this.stmtInsert = db.prepare(`
-      INSERT INTO tasks (id, task_type, title, description, source, priority, depends_on, parent_task_id, repo)
-      VALUES (@id, @taskType, @title, @description, @source, @priority, @dependsOn, @parentTaskId, @repo)
+      INSERT INTO tasks (id, task_type, title, description, source, priority, depends_on, parent_task_id, context_file, repo)
+      VALUES (@id, @taskType, @title, @description, @source, @priority, @dependsOn, @parentTaskId, @contextFile, @repo)
     `);
 
     this.stmtGetNext = db.prepare(`
@@ -106,6 +106,7 @@ export class TaskQueue {
       priority: input.priority,
       dependsOn: input.dependsOn,
       parentTaskId: input.parentTaskId,
+      contextFile: input.contextFile ?? null,
       repo: input.repo ?? null,
     });
   }
@@ -184,7 +185,7 @@ export class TaskQueue {
   }
 
   approveTask(id: string): void {
-    this.updateStatus(id, "in_progress");
+    this.updateStatus(id, "completed");
   }
 
   rejectTask(id: string): void {
@@ -193,6 +194,38 @@ export class TaskQueue {
     if (task?.parentTaskId) {
       this.cancelPipelineSuccessors(task.parentTaskId, id);
     }
+  }
+
+  failTask(id: string, reason: string): void {
+    const task = this.getById(id);
+    this.updateStatus(id, "failed", { result: reason });
+    if (task?.parentTaskId) {
+      this.cancelPipelineSuccessors(task.parentTaskId, id);
+    }
+  }
+
+  recoverStuckTasks(stuckThresholdMs: number = 60 * 60 * 1000): number {
+    const cutoff = new Date(Date.now() - stuckThresholdMs).toISOString();
+    const result = this.db
+      .prepare(
+        `UPDATE tasks SET status = 'failed', result = 'Stuck task detected (exceeded timeout threshold)'
+         WHERE status IN ('in_progress', 'planning', 'validating')
+           AND started_at IS NOT NULL AND started_at < ?`,
+      )
+      .run(cutoff);
+    return result.changes;
+  }
+
+  recoverStaleApprovals(staleThresholdMs: number = 7 * 24 * 60 * 60 * 1000): number {
+    const cutoff = new Date(Date.now() - staleThresholdMs).toISOString();
+    const result = this.db
+      .prepare(
+        `UPDATE tasks SET status = 'failed', result = 'Stale approval — exceeded waiting threshold'
+         WHERE status = 'awaiting_approval'
+           AND started_at IS NOT NULL AND started_at < ?`,
+      )
+      .run(cutoff);
+    return result.changes;
   }
 
   cancelPipelineSuccessors(parentTaskId: string, excludeId: string): void {

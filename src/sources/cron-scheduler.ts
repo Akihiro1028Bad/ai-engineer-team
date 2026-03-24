@@ -10,7 +10,10 @@ type CronCallback = () => void | Promise<void>;
 export class CronScheduler {
   private readonly extraJobs: { label: string; check: (now: Date) => boolean; callback: CronCallback }[] = [];
 
-  constructor(private readonly queue: TaskQueue) {}
+  constructor(
+    private readonly queue: TaskQueue,
+    private readonly defaultRepo: string | null = null,
+  ) {}
 
   /** カスタム Cron ジョブを登録する */
   registerJob(label: string, check: (now: Date) => boolean, callback: CronCallback): void {
@@ -36,7 +39,7 @@ export class CronScheduler {
           priority: 5,
           dependsOn: null,
           parentTaskId: null,
-          repo: null,
+          repo: this.defaultRepo,
         });
       }
     }
@@ -55,7 +58,7 @@ export class CronScheduler {
           priority: 7,
           dependsOn: null,
           parentTaskId: null,
-          repo: null,
+          repo: this.defaultRepo,
         });
       }
     }

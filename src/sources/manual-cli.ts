@@ -38,6 +38,7 @@ export function parseAndPush(args: string[], queue: TaskQueue): ParseResult {
 
   const priority = parsed.get("priority") ? Number(parsed.get("priority")) : 5;
   const dependsOn = parsed.get("depends-on") ?? null;
+  const repo = parsed.get("repo") ?? null;
 
   counter += 1;
   const id = `manual-${counter}`;
@@ -51,7 +52,7 @@ export function parseAndPush(args: string[], queue: TaskQueue): ParseResult {
     priority,
     dependsOn,
     parentTaskId: null,
-    repo: null,
+    repo,
   });
 
   return { success: true };

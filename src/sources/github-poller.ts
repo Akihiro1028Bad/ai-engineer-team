@@ -282,8 +282,11 @@ export class GitHubPoller {
     const awaiting = this.queue.getAwaitingApproval();
     if (awaiting.length === 0) return;
 
+    const myRepo = `${this.owner}/${this.repo}`;
     for (const task of awaiting) {
       if (!task.approvalPrUrl) continue;
+      // 自リポジトリのタスクのみ処理する（マルチリポ対応）
+      if (task.repo && task.repo !== myRepo) continue;
 
       try {
         const prNumber = this.extractPrNumber(task.approvalPrUrl);

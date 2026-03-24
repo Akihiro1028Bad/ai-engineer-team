@@ -25,6 +25,8 @@ export interface DispatchResult {
   error?: string;
   pushed: boolean;
   branch?: string;
+  /** push 失敗時のエラー詳細 */
+  pushError?: string;
   /** Reviewer が作成した設計書のパス */
   designFilePath?: string;
 }
@@ -156,7 +158,10 @@ export class Dispatcher {
         const commitMessage = task.taskType === "review"
           ? `design: ${task.title} (#${issueNumber ?? task.id})`
           : `${task.taskType}: ${task.title} (#${issueNumber ?? task.id})`;
-        const pushed = this.worktreeManager.commitAndPush(task.id, commitMessage);
+        // existingBranch使用時: ローカルブランチ(agent/{taskId})からリモートの元ブランチにpush
+        const targetBranch = task.contextFile ?? (existingBranch || undefined);
+        const commitResult = this.worktreeManager.commitAndPush(task.id, commitMessage, targetBranch);
+        const pushed = commitResult.status === "pushed";
 
         return {
           status: "completed",
@@ -166,7 +171,8 @@ export class Dispatcher {
           result: resultMsg.result,
           structuredOutput: resultMsg.structured_output,
           pushed,
-          branch: pushed ? branch : undefined,
+          branch: pushed ? commitResult.branch : undefined,
+          pushError: commitResult.status === "push_failed" ? commitResult.error : undefined,
           designFilePath,
         };
       }
@@ -186,9 +192,11 @@ export class Dispatcher {
         const commitMessage = task.taskType === "review"
           ? `design: ${task.title} (#${issueNumber ?? task.id})`
           : `${task.taskType}: ${task.title} (#${issueNumber ?? task.id})`;
-        const pushed = this.worktreeManager.hasDiff(task.id)
-          ? this.worktreeManager.commitAndPush(task.id, commitMessage)
-          : false;
+        const targetBranchFallback = task.contextFile ?? (existingBranch || undefined);
+        const commitResult = this.worktreeManager.hasDiff(task.id)
+          ? this.worktreeManager.commitAndPush(task.id, commitMessage, targetBranchFallback)
+          : { status: "no_diff" as const };
+        const pushed = commitResult.status === "pushed";
         return {
           status: "completed",
           costUsd: resultMsg.total_cost_usd,
@@ -197,7 +205,8 @@ export class Dispatcher {
           result: resultMsg.result,
           structuredOutput: resultMsg.structured_output,
           pushed,
-          branch: pushed ? branch : undefined,
+          branch: pushed ? commitResult.branch : undefined,
+          pushError: commitResult.status === "push_failed" ? commitResult.error : undefined,
         };
       }
       const message = error instanceof Error ? error.message : "Unknown error";
